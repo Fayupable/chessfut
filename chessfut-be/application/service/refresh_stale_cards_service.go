@@ -54,3 +54,10 @@ func (s *RefreshStaleCardsService) Execute(ctx context.Context, batchSize int) (
 
 	return refreshed, nil
 }
+
+func (s *RefreshStaleCardsService) buildCardByType(ctx context.Context, username string, cardType domain.CardType) (domain.Card, error) {
+	if cardType == domain.CardTypeDetailed {
+		return buildDetailedCard(ctx, s.chessComClient, username)
+	}
+	return buildFastCard(ctx, s.chessComClient, username)
+}

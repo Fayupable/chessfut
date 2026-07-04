@@ -1,0 +1,95 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	redislib "github.com/redis/go-redis/v9"
+
+	"github.com/fayupable/chessfut-be/adapter/chesscom"
+	httpadapter "github.com/fayupable/chessfut-be/adapter/http"
+	"github.com/fayupable/chessfut-be/adapter/postgres"
+	redisadapter "github.com/fayupable/chessfut-be/adapter/redis"
+	"github.com/fayupable/chessfut-be/application/service"
+	"github.com/fayupable/chessfut-be/config"
+)
+
+func main() {
+	cfg := config.Load()
+	ctx := context.Background()
+
+	if err := postgres.RunMigrations(cfg.DatabaseURL, cfg.MigrationsPath); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
+
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to connect to postgres: %v", err)
+	}
+	defer pool.Close()
+
+	redisClient := redislib.NewClient(&redislib.Options{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPassword,
+	})
+	defer redisClient.Close()
+
+	chessComClient := chesscom.NewClient(cfg.ChessComUserAgent)
+	cardRepository := postgres.NewCardRepository(pool)
+	cache := redisadapter.NewCache(redisClient)
+
+	getFastCard := service.NewGetFastCardService(chessComClient, cardRepository, cache)
+	getDetailedCard := service.NewGetDetailedCardService(chessComClient, cardRepository, cache)
+	getLeaderboard := service.NewGetLeaderboardService(cardRepository)
+	refreshCard := service.NewRefreshCardService(chessComClient, cardRepository, cache)
+	syncTitledPlayers := service.NewSyncTitledPlayersService(chessComClient, cardRepository)
+	refreshStaleCards := service.NewRefreshStaleCardsService(chessComClient, cardRepository, cache)
+
+	cardHandler := httpadapter.NewCardHandler(getFastCard, getDetailedCard, getLeaderboard)
+	adminHandler := httpadapter.NewAdminHandler(refreshCard, syncTitledPlayers, refreshStaleCards)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/player/{username}", cardHandler.GetFastCard)
+	mux.HandleFunc("GET /api/v1/player/{username}/detailed", cardHandler.GetDetailedCard)
+	mux.HandleFunc("GET /api/v1/leaderboard", cardHandler.GetLeaderboard)
+
+	mux.HandleFunc("POST /api/admin/refresh/{username}", httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshCard))
+	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers))
+	mux.HandleFunc("POST /api/admin/refresh-stale", httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshStaleCards))
+
+	startBackgroundJobs(refreshStaleCards, syncTitledPlayers)
+
+	log.Printf("chessfut-be listening on :%s", cfg.Port)
+	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}
+
+func startBackgroundJobs(refreshStaleCards *service.RefreshStaleCardsService, syncTitledPlayers *service.SyncTitledPlayersService) {
+	staleTicker := time.NewTicker(10 * time.Minute)
+	go func() {
+		for range staleTicker.C {
+			count, err := refreshStaleCards.Execute(context.Background(), 50)
+			if err != nil {
+				log.Printf("refresh stale cards failed: %v", err)
+				continue
+			}
+			log.Printf("refreshed %d stale cards", count)
+		}
+	}()
+
+	syncTicker := time.NewTicker(24 * time.Hour)
+	go func() {
+		for range syncTicker.C {
+			count, err := syncTitledPlayers.Execute(context.Background())
+			if err != nil {
+				log.Printf("sync titled players failed: %v", err)
+				continue
+			}
+			log.Printf("synced %d new titled players", count)
+		}
+	}()
+}

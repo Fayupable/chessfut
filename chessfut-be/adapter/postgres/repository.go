@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -73,4 +74,81 @@ func (r *CardRepository) FindByUsername(ctx context.Context, username string) (d
 	}
 
 	return fromCardDataModel(model, cardType, tier, computedAt, expires), true, nil
+}
+
+func (r *CardRepository) FindStale(ctx context.Context, before time.Time, limit int) ([]domain.Card, error) {
+	const query = `
+		SELECT card_data, card_type, tier, computed_at, expires_at
+		FROM player_cards
+		WHERE expires_at < $1
+		ORDER BY expires_at ASC
+		LIMIT $2
+	`
+
+	rows, err := r.pool.Query(ctx, query, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	for rows.Next() {
+		var (
+			rawData        []byte
+			cardType, tier string
+			computedAt     time.Time
+			expiresAt      time.Time
+		)
+
+		if err := rows.Scan(&rawData, &cardType, &tier, &computedAt, &expiresAt); err != nil {
+			return nil, err
+		}
+
+		var model cardDataModel
+		if err := json.Unmarshal(rawData, &model); err != nil {
+			return nil, err
+		}
+
+		cards = append(cards, fromCardDataModel(model, cardType, tier, computedAt, expiresAt))
+	}
+
+	return cards, rows.Err()
+}
+
+func (r *CardRepository) FindTopByOVR(ctx context.Context, limit int) ([]domain.Card, error) {
+	const query = `
+		SELECT card_data, card_type, tier, computed_at, expires_at
+		FROM player_cards
+		ORDER BY (card_data->>'ovr')::int DESC
+		LIMIT $1
+	`
+
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	for rows.Next() {
+		var (
+			rawData        []byte
+			cardType, tier string
+			computedAt     time.Time
+			expiresAt      time.Time
+		)
+
+		if err := rows.Scan(&rawData, &cardType, &tier, &computedAt, &expiresAt); err != nil {
+			return nil, err
+		}
+
+		var model cardDataModel
+		if err := json.Unmarshal(rawData, &model); err != nil {
+			return nil, err
+		}
+
+		cards = append(cards, fromCardDataModel(model, cardType, tier, computedAt, expiresAt))
+	}
+
+	return cards, rows.Err()
 }
