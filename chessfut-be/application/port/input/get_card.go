@@ -13,3 +13,7 @@ type GetFastCardUseCase interface {
 type GetDetailedCardUseCase interface {
 	Execute(ctx context.Context, username string) (domain.Card, error)
 }
+
+type GetLeaderboardUseCase interface {
+	Execute(ctx context.Context, limit int) ([]domain.Card, error)
+}

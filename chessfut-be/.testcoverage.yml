@@ -1,0 +1,18 @@
+threshold:
+  file: 70
+  package: 75
+  total: 80
+
+exclude:
+  paths:
+    - main.go
+    - config/
+    - adapter/postgres/migrate.go
+    - adapter/postgres/
+    - adapter/redis/
+    - adapter/http/
+    - adapter/health/
+
+override:
+  - threshold: 90
+    path: application/service

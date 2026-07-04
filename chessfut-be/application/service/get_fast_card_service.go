@@ -33,16 +33,20 @@ func NewGetFastCardService(
 var _ input.GetFastCardUseCase = (*GetFastCardService)(nil)
 
 func (s *GetFastCardService) Execute(ctx context.Context, username string) (domain.Card, error) {
-	if card, found, err := s.cache.GetCard(ctx, username); err == nil && found && !card.IsExpired() {
+	if card, found, err := s.cache.GetCard(ctx, username); err == nil && found {
 		return card, nil
 	}
 
-	if card, found, err := s.cardRepository.FindByUsername(ctx, username); err == nil && found && !card.IsExpired() {
-		s.promoteIfPopular(ctx, username, card)
-		return card, nil
+	existing, found, err := s.cardRepository.FindByUsername(ctx, username)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	if found {
+		s.promoteIfPopular(ctx, username, existing)
+		return existing, nil
 	}
 
-	card, err := s.buildFastCard(ctx, username)
+	card, err := buildFastCard(ctx, s.chessComClient, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
@@ -55,13 +59,13 @@ func (s *GetFastCardService) Execute(ctx context.Context, username string) (doma
 	return card, nil
 }
 
-func (s *GetFastCardService) buildFastCard(ctx context.Context, username string) (domain.Card, error) {
-	player, err := s.chessComClient.GetProfile(ctx, username)
+func buildFastCard(ctx context.Context, client output.ChessComClientPort, username string) (domain.Card, error) {
+	player, err := client.GetProfile(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
 
-	stats, err := s.chessComClient.GetStats(ctx, username)
+	stats, err := client.GetStats(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
@@ -73,18 +77,25 @@ func (s *GetFastCardService) buildFastCard(ctx context.Context, username string)
 
 	now := time.Now()
 	return domain.Card{
-		Player:     player,
-		Stats:      stats,
-		CardType:   domain.CardTypeFast,
-		Tier:       tier,
-		OVR:        CalculateOVR(stats),
-		Badges:     AssignBadges(player, stats),
-		ComputedAt: now,
-		ExpiresAt:  now.Add(cardTTL),
+		Player:        player,
+		Stats:         stats,
+		CardType:      domain.CardTypeFast,
+		Tier:          tier,
+		OVR:           CalculateOVR(stats),
+		Position:      domain.PositionAllRounder,
+		Badges:        AssignBadges(player, stats),
+		GamesSnapshot: domain.TotalGames(stats),
+		ComputedAt:    now,
+		ExpiresAt:     now.Add(cardTTL),
 	}, nil
 }
 
 func (s *GetFastCardService) promoteIfPopular(ctx context.Context, username string, card domain.Card) {
+	if card.Player.HasFideTitle() {
+		_ = s.cache.SetCard(ctx, card)
+		return
+	}
+
 	count, err := s.cache.IncrementViewCount(ctx, username)
 	if err != nil {
 		return

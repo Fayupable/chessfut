@@ -1,0 +1,1 @@
+CREATE INDEX idx_player_cards_ovr ON player_cards (((card_data->>'ovr')::int) DESC);

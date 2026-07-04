@@ -1,50 +1,10 @@
-package postgres
+package redis
 
 import (
-	"time"
-
 	"github.com/fayupable/chessfut-be/domain"
 )
 
-type openingStatModel struct {
-	ECO    string `json:"eco"`
-	Name   string `json:"name"`
-	Count  int    `json:"count"`
-	Wins   int    `json:"wins"`
-	Losses int    `json:"losses"`
-	Draws  int    `json:"draws"`
-}
-
-type timeControlStatsModel struct {
-	Rating  int `json:"rating"`
-	Highest int `json:"highest"`
-	Wins    int `json:"wins"`
-	Losses  int `json:"losses"`
-	Draws   int `json:"draws"`
-}
-
-type cardDataModel struct {
-	Username      string                `json:"username"`
-	Name          string                `json:"name"`
-	Title         string                `json:"title"`
-	Avatar        string                `json:"avatar"`
-	Followers     int                   `json:"followers"`
-	CountryCode   string                `json:"country_code"`
-	JoinedAt      time.Time             `json:"joined_at"`
-	FideRating    int                   `json:"fide_rating"`
-	Bullet        timeControlStatsModel `json:"bullet"`
-	Blitz         timeControlStatsModel `json:"blitz"`
-	Rapid         timeControlStatsModel `json:"rapid"`
-	Daily         timeControlStatsModel `json:"daily"`
-	OVR           int                   `json:"ovr"`
-	PlayStyle     string                `json:"play_style"`
-	Position      string                `json:"position"`
-	Badges        []string              `json:"badges"`
-	TopOpenings   []openingStatModel    `json:"top_openings"`
-	GamesSnapshot int                   `json:"games_snapshot"`
-}
-
-func toCardDataModel(c domain.Card) cardDataModel {
+func toCardModel(c domain.Card) cardModel {
 	badges := make([]string, 0, len(c.Badges))
 	for _, b := range c.Badges {
 		badges = append(badges, string(b))
@@ -58,7 +18,7 @@ func toCardDataModel(c domain.Card) cardDataModel {
 		})
 	}
 
-	return cardDataModel{
+	return cardModel{
 		Username:      c.Player.Username,
 		Name:          c.Player.Name,
 		Title:         string(c.Player.Title),
@@ -71,12 +31,16 @@ func toCardDataModel(c domain.Card) cardDataModel {
 		Blitz:         toTimeControlModel(c.Stats.Blitz),
 		Rapid:         toTimeControlModel(c.Stats.Rapid),
 		Daily:         toTimeControlModel(c.Stats.Daily),
+		CardType:      string(c.CardType),
+		Tier:          string(c.Tier),
 		OVR:           c.OVR,
 		PlayStyle:     string(c.PlayStyle),
 		Position:      string(c.Position),
 		Badges:        badges,
 		TopOpenings:   openings,
 		GamesSnapshot: c.GamesSnapshot,
+		ComputedAt:    c.ComputedAt,
+		ExpiresAt:     c.ExpiresAt,
 	}
 }
 
@@ -84,7 +48,7 @@ func toTimeControlModel(s domain.TimeControlStats) timeControlStatsModel {
 	return timeControlStatsModel{Rating: s.Rating, Highest: s.Highest, Wins: s.Wins, Losses: s.Losses, Draws: s.Draws}
 }
 
-func fromCardDataModel(m cardDataModel, cardType, tier string, computedAt, expiresAt time.Time) domain.Card {
+func fromCardModel(m cardModel) domain.Card {
 	badges := make([]domain.Badge, 0, len(m.Badges))
 	for _, b := range m.Badges {
 		badges = append(badges, domain.Badge(b))
@@ -110,16 +74,16 @@ func fromCardDataModel(m cardDataModel, cardType, tier string, computedAt, expir
 			Rapid:      fromTimeControlModel(m.Rapid, domain.TimeControlRapid),
 			Daily:      fromTimeControlModel(m.Daily, domain.TimeControlDaily),
 		},
-		CardType:      domain.CardType(cardType),
-		Tier:          domain.CardTier(tier),
+		CardType:      domain.CardType(m.CardType),
+		Tier:          domain.CardTier(m.Tier),
 		OVR:           m.OVR,
 		PlayStyle:     domain.PlayStyle(m.PlayStyle),
 		Position:      domain.Position(m.Position),
 		Badges:        badges,
 		TopOpenings:   openings,
 		GamesSnapshot: m.GamesSnapshot,
-		ComputedAt:    computedAt,
-		ExpiresAt:     expiresAt,
+		ComputedAt:    m.ComputedAt,
+		ExpiresAt:     m.ExpiresAt,
 	}
 }
 
