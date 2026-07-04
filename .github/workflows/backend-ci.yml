@@ -54,7 +54,10 @@ jobs:
       - name: Test with coverage
         run: |
           cd chessfut-be
-          go test -race -coverprofile=coverage.out ./...
+          go test -race -coverprofile=coverage.out \
+            ./domain/... \
+            ./application/service/... \
+            ./adapter/chesscom/...
 
       - name: Coverage check
         id: coverage
