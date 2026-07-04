@@ -37,9 +37,13 @@ func (s *GetFastCardService) Execute(ctx context.Context, username string) (doma
 		return card, nil
 	}
 
-	if card, found, err := s.cardRepository.FindByUsername(ctx, username); err == nil && found {
-		s.promoteIfPopular(ctx, username, card)
-		return card, nil
+	existing, found, err := s.cardRepository.FindByUsername(ctx, username)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	if found {
+		s.promoteIfPopular(ctx, username, existing)
+		return existing, nil
 	}
 
 	card, err := buildFastCard(ctx, s.chessComClient, username)

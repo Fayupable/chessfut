@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/fayupable/chessfut-be/adapter/health"
 	"github.com/jackc/pgx/v5/pgxpool"
 	redislib "github.com/redis/go-redis/v9"
 
@@ -43,8 +44,17 @@ func main() {
 	})
 	defer redisClient.Close()
 
-	chessComClient := chesscom.NewClient(cfg.ChessComUserAgent)
+	chessComClient := chesscom.NewClient(cfg.ChessComUserAgent, cfg.ChessComBaseURL)
 	cardRepository := postgres.NewCardRepository(pool)
+
+	postgresChecker := health.NewChecker("postgres", func(ctx context.Context) error {
+		return pool.Ping(ctx)
+	})
+	redisChecker := health.NewChecker("redis", func(ctx context.Context) error {
+		return redisClient.Ping(ctx).Err()
+	})
+	postgresChecker.Start(ctx)
+	redisChecker.Start(ctx)
 	cache := redisadapter.NewCache(redisClient)
 
 	getFastCard := service.NewGetFastCardService(chessComClient, cardRepository, cache)

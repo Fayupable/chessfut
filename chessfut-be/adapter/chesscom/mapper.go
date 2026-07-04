@@ -154,25 +154,3 @@ func countMoves(pgn string) int {
 func mapTitledUsernames(r titledResponse) []string {
 	return r.Players
 }
-
-//
-//func mapLeaderboards(r leaderboardsResponse) domain.Leaderboards {
-//	return domain.Leaderboards{
-//		Bullet: mapLeaderboardEntries(r.LiveBullet),
-//		Blitz:  mapLeaderboardEntries(r.LiveBlitz),
-//		Rapid:  mapLeaderboardEntries(r.LiveRapid),
-//		Daily:  mapLeaderboardEntries(r.Daily),
-//	}
-//}
-//
-//func mapLeaderboardEntries(entries []leaderboardEntryResponse) []domain.LeaderboardEntry {
-//	result := make([]domain.LeaderboardEntry, 0, len(entries))
-//	for _, e := range entries {
-//		result = append(result, domain.LeaderboardEntry{
-//			Username: e.Username,
-//			Rank:     e.Rank,
-//			Rating:   e.Score,
-//		})
-//	}
-//	return result
-//}

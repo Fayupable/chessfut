@@ -60,16 +60,3 @@ type gamesResponse struct {
 type titledResponse struct {
 	Players []string `json:"players"`
 }
-
-//type leaderboardEntryResponse struct {
-//	Username string `json:"username"`
-//	Rank     int    `json:"rank"`
-//	Score    int    `json:"score"`
-//}
-//
-//type leaderboardsResponse struct {
-//	LiveBullet []leaderboardEntryResponse `json:"live_bullet"`
-//	LiveBlitz  []leaderboardEntryResponse `json:"live_blitz"`
-//	LiveRapid  []leaderboardEntryResponse `json:"live_rapid"`
-//	Daily      []leaderboardEntryResponse `json:"daily"`
-//}

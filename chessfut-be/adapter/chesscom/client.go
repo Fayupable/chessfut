@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,27 +15,17 @@ import (
 	"github.com/fayupable/chessfut-be/domain"
 )
 
-const baseURL = "https://api.chess.com/pub"
-
 type Client struct {
 	httpClient *http.Client
 	limiter    *rate.Limiter
 	group      singleflight.Group
 	userAgent  string
+	baseURL    string
 }
-
-//func (c *Client) GetLeaderboards(ctx context.Context) (domain.Leaderboards, error) {
-//	var resp leaderboardsResponse
-//	url := fmt.Sprintf("%s/leaderboards", baseURL)
-//	if err := c.doRequest(ctx, url, &resp); err != nil {
-//		return domain.Leaderboards{}, err
-//	}
-//	return mapLeaderboards(resp), nil
-//}
 
 func (c *Client) GetGames(ctx context.Context, username string, from, to time.Time) ([]domain.Game, error) {
 	var archives archivesResponse
-	archivesURL := fmt.Sprintf("%s/player/%s/games/archives", baseURL, username)
+	archivesURL := fmt.Sprintf("%s/player/%s/games/archives", c.baseURL, username)
 	if err := c.doRequest(ctx, archivesURL, &archives); err != nil {
 		return nil, err
 	}
@@ -63,17 +54,20 @@ func (c *Client) GetGames(ctx context.Context, username string, from, to time.Ti
 	return games, nil
 }
 
-func NewClient(userAgent string) *Client {
+func NewClient(userAgent, baseURL string) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 		limiter:    rate.NewLimiter(rate.Limit(1), 2),
 		userAgent:  userAgent,
+		baseURL:    baseURL,
 	}
 }
 
 var _ output.ChessComClientPort = (*Client)(nil)
 
 func (c *Client) doRequest(ctx context.Context, url string, target any) error {
+	start := time.Now()
+
 	if err := c.limiter.Wait(ctx); err != nil {
 		return err
 	}
@@ -86,9 +80,16 @@ func (c *Client) doRequest(ctx context.Context, url string, target any) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		slog.Error("chesscom_request", "url", url, "error", err.Error(), "duration_ms", time.Since(start).Milliseconds())
 		return err
 	}
 	defer resp.Body.Close()
+
+	slog.Info("chesscom_request",
+		"url", url,
+		"status", resp.StatusCode,
+		"duration_ms", time.Since(start).Milliseconds(),
+	)
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		c.backOff()
@@ -117,7 +118,7 @@ func (c *Client) fetchDeduped(ctx context.Context, key, url string, target any) 
 
 func (c *Client) GetProfile(ctx context.Context, username string) (domain.Player, error) {
 	var resp profileResponse
-	url := fmt.Sprintf("%s/player/%s", baseURL, username)
+	url := fmt.Sprintf("%s/player/%s", c.baseURL, username)
 	if err := c.fetchDeduped(ctx, "profile:"+username, url, &resp); err != nil {
 		return domain.Player{}, err
 	}
@@ -126,7 +127,7 @@ func (c *Client) GetProfile(ctx context.Context, username string) (domain.Player
 
 func (c *Client) GetStats(ctx context.Context, username string) (domain.PlayerStats, error) {
 	var resp statsResponse
-	url := fmt.Sprintf("%s/player/%s/stats", baseURL, username)
+	url := fmt.Sprintf("%s/player/%s/stats", c.baseURL, username)
 	if err := c.fetchDeduped(ctx, "stats:"+username, url, &resp); err != nil {
 		return domain.PlayerStats{}, err
 	}
@@ -135,7 +136,7 @@ func (c *Client) GetStats(ctx context.Context, username string) (domain.PlayerSt
 
 func (c *Client) GetTitledUsernames(ctx context.Context, title domain.Title) ([]string, error) {
 	var resp titledResponse
-	url := fmt.Sprintf("%s/titled/%s", baseURL, title)
+	url := fmt.Sprintf("%s/titled/%s", c.baseURL, title)
 	if err := c.doRequest(ctx, url, &resp); err != nil {
 		return nil, err
 	}
