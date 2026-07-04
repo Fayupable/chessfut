@@ -33,11 +33,11 @@ func NewGetFastCardService(
 var _ input.GetFastCardUseCase = (*GetFastCardService)(nil)
 
 func (s *GetFastCardService) Execute(ctx context.Context, username string) (domain.Card, error) {
-	if card, found, err := s.cache.GetCard(ctx, username); err == nil && found && !card.IsExpired() {
+	if card, found, err := s.cache.GetCard(ctx, username); err == nil && found {
 		return card, nil
 	}
 
-	if card, found, err := s.cardRepository.FindByUsername(ctx, username); err == nil && found && !card.IsExpired() {
+	if card, found, err := s.cardRepository.FindByUsername(ctx, username); err == nil && found {
 		s.promoteIfPopular(ctx, username, card)
 		return card, nil
 	}
@@ -78,6 +78,7 @@ func buildFastCard(ctx context.Context, client output.ChessComClientPort, userna
 		CardType:      domain.CardTypeFast,
 		Tier:          tier,
 		OVR:           CalculateOVR(stats),
+		Position:      domain.PositionAllRounder,
 		Badges:        AssignBadges(player, stats),
 		GamesSnapshot: domain.TotalGames(stats),
 		ComputedAt:    now,
@@ -86,6 +87,11 @@ func buildFastCard(ctx context.Context, client output.ChessComClientPort, userna
 }
 
 func (s *GetFastCardService) promoteIfPopular(ctx context.Context, username string, card domain.Card) {
+	if card.Player.HasFideTitle() {
+		_ = s.cache.SetCard(ctx, card)
+		return
+	}
+
 	count, err := s.cache.IncrementViewCount(ctx, username)
 	if err != nil {
 		return

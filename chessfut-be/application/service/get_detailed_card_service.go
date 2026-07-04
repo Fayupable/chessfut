@@ -42,7 +42,7 @@ func (s *GetDetailedCardService) Execute(ctx context.Context, username string) (
 		return domain.Card{}, err
 	}
 	if found && existing.CardType == domain.CardTypeDetailed {
-		_ = s.cache.SetCard(ctx, existing)
+		s.promoteIfPopular(ctx, username, existing)
 		return existing, nil
 	}
 
@@ -51,57 +51,38 @@ func (s *GetDetailedCardService) Execute(ctx context.Context, username string) (
 
 func (s *GetDetailedCardService) tryCache(ctx context.Context, username string) (domain.Card, bool) {
 	card, found, err := s.cache.GetCard(ctx, username)
-	if err != nil || !found || card.IsExpired() || card.CardType != domain.CardTypeDetailed {
+	if err != nil || !found || card.CardType != domain.CardTypeDetailed {
 		return domain.Card{}, false
 	}
 	return card, true
 }
 
-func (s *GetDetailedCardService) tryTouch(ctx context.Context, username string, existing domain.Card) (domain.Card, bool) {
-	freshStats, err := s.chessComClient.GetStats(ctx, username)
-	if err != nil {
-		return domain.Card{}, false
-	}
-
-	delta := domain.TotalGames(freshStats) - existing.GamesSnapshot
-	if delta >= minGamesDeltaForRebuild {
-		return domain.Card{}, false
-	}
-
-	touched := existing
-	touched.Stats = freshStats
-	touched.ExpiresAt = time.Now().Add(cardTTL)
-	if err := s.cardRepository.Save(ctx, touched); err != nil {
-		return domain.Card{}, false
-	}
-	return touched, true
-}
-
 func (s *GetDetailedCardService) rebuild(ctx context.Context, username string) (domain.Card, error) {
-	card, err := s.buildDetailedCard(ctx, username)
+	card, err := buildDetailedCard(ctx, s.chessComClient, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
 	if err := s.cardRepository.Save(ctx, card); err != nil {
 		return domain.Card{}, err
 	}
+	s.promoteIfPopular(ctx, username, card)
 	return card, nil
 }
 
-func (s *GetDetailedCardService) buildDetailedCard(ctx context.Context, username string) (domain.Card, error) {
-	player, err := s.chessComClient.GetProfile(ctx, username)
+func buildDetailedCard(ctx context.Context, client output.ChessComClientPort, username string) (domain.Card, error) {
+	player, err := client.GetProfile(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
 
-	stats, err := s.chessComClient.GetStats(ctx, username)
+	stats, err := client.GetStats(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
 
 	to := time.Now()
 	from := to.Add(-detailedGamesWindow)
-	games, err := s.chessComClient.GetGames(ctx, username, from, to)
+	games, err := client.GetGames(ctx, username, from, to)
 	if err != nil {
 		return domain.Card{}, err
 	}
@@ -112,17 +93,34 @@ func (s *GetDetailedCardService) buildDetailedCard(ctx context.Context, username
 	}
 
 	now := time.Now()
+	playStyle := DeterminePlayStyle(games)
 	return domain.Card{
 		Player:        player,
 		Stats:         stats,
 		CardType:      domain.CardTypeDetailed,
 		Tier:          tier,
 		OVR:           CalculateOVR(stats),
-		PlayStyle:     DeterminePlayStyle(games),
+		PlayStyle:     playStyle,
+		Position:      domain.MapToPosition(playStyle),
 		Badges:        AssignBadges(player, stats),
 		TopOpenings:   aggregateTopOpenings(games),
 		GamesSnapshot: domain.TotalGames(stats),
 		ComputedAt:    now,
 		ExpiresAt:     now.Add(cardTTL),
 	}, nil
+}
+
+func (s *GetDetailedCardService) promoteIfPopular(ctx context.Context, username string, card domain.Card) {
+	if card.Player.HasFideTitle() {
+		_ = s.cache.SetCard(ctx, card)
+		return
+	}
+
+	count, err := s.cache.IncrementViewCount(ctx, username)
+	if err != nil {
+		return
+	}
+	if count >= viewPromotionThreshold {
+		_ = s.cache.SetCard(ctx, card)
+	}
 }
