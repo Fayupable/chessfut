@@ -28,7 +28,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
           cache-dependency-path: chessfut-be/go.sum
 
       - name: Check formatting
@@ -52,6 +52,7 @@ jobs:
           version: latest
           working-directory: chessfut-be
           args: --config=.golangci.yml
+          install-mode: goinstall
 
       - name: Test with coverage
         run: go test ./... -race -coverprofile=coverage.out
