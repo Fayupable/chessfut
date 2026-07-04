@@ -9,7 +9,7 @@ import (
 	"github.com/fayupable/chessfut-be/domain"
 )
 
-const detailedGamesWindow = 2 * 30 * 24 * time.Hour
+const detailedGamesWindow = 30 * 24 * time.Hour
 const minGamesDeltaForRebuild = 50
 
 type GetDetailedCardService struct {

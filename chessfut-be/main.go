@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,12 +20,16 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
 	cfg := config.Load()
 	ctx := context.Background()
 
 	if err := postgres.RunMigrations(cfg.DatabaseURL, cfg.MigrationsPath); err != nil {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
+	log.Println("migrations applied successfully")
 
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -52,13 +58,13 @@ func main() {
 	adminHandler := httpadapter.NewAdminHandler(refreshCard, syncTitledPlayers, refreshStaleCards)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/player/{username}", cardHandler.GetFastCard)
-	mux.HandleFunc("GET /api/v1/player/{username}/detailed", cardHandler.GetDetailedCard)
-	mux.HandleFunc("GET /api/v1/leaderboard", cardHandler.GetLeaderboard)
+	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.LoggingMiddleware(cardHandler.GetFastCard))
+	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.LoggingMiddleware(cardHandler.GetDetailedCard))
+	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.LoggingMiddleware(cardHandler.GetLeaderboard))
 
-	mux.HandleFunc("POST /api/admin/refresh/{username}", httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshCard))
-	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers))
-	mux.HandleFunc("POST /api/admin/refresh-stale", httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshStaleCards))
+	mux.HandleFunc("POST /api/admin/refresh/{username}", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshCard)))
+	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers)))
+	mux.HandleFunc("POST /api/admin/refresh-stale", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshStaleCards)))
 
 	startBackgroundJobs(refreshStaleCards, syncTitledPlayers)
 
