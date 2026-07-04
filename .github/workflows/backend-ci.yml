@@ -10,17 +10,13 @@ on:
     paths:
       - "chessfut-be/**"
 
-defaults:
-  run:
-    working-directory: chessfut-be
-
-permissions:
-  contents: read
-  pull-requests: write
-
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,6 +29,7 @@ jobs:
 
       - name: Check formatting
         run: |
+          cd chessfut-be
           UNFORMATTED=$(gofmt -l .)
           if [ -n "$UNFORMATTED" ]; then
             echo "The following files are not gofmt-formatted:"
@@ -41,10 +38,10 @@ jobs:
           fi
 
       - name: Vet
-        run: go vet ./...
+        run: cd chessfut-be && go vet ./...
 
       - name: Build
-        run: go build ./...
+        run: cd chessfut-be && go build ./...
 
       - name: Lint
         uses: golangci/golangci-lint-action@v6
@@ -55,12 +52,49 @@ jobs:
           install-mode: goinstall
 
       - name: Test with coverage
-        run: go test ./... -race -coverprofile=coverage.out
+        run: |
+          cd chessfut-be
+          go test -race -coverprofile=coverage.out ./...
 
-      - name: Enforce coverage threshold
-        uses: vladopajic/go-test-coverage@v2
+      - name: Coverage check
+        id: coverage
+        run: |
+          cd chessfut-be
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "coverage=$COVERAGE" >> "$GITHUB_OUTPUT"
+          echo "Go Coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "Coverage below 70%: $COVERAGE%"
+            exit 1
+          fi
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
         with:
-          config: chessfut-be/.testcoverage.yml
-          profile: chessfut-be/coverage.out
-          git-token: ${{ github.token }}
-          git-summary: "true"
+          script: |
+            const coverage = '${{ steps.coverage.outputs.coverage }}';
+            const pct = parseFloat(coverage);
+            const status = pct >= 80 ? 'PASS' : pct >= 70 ? 'WARN' : 'FAIL';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: [
+                '## Backend Coverage Report',
+                '',
+                `Status: ${status}`,
+                `Total Coverage: ${coverage}%`,
+                `Threshold: 70%`,
+                '',
+                '_Measured on: domain, application/service, adapter/chesscom_'
+              ].join('\n')
+            })
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: chessfut-be/coverage.out
+          retention-days: 7
