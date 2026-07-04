@@ -42,6 +42,7 @@ type Card struct {
 	Tier          CardTier
 	OVR           int
 	PlayStyle     PlayStyle
+	Position      Position
 	Badges        []Badge
 	TopOpenings   []OpeningStat
 	GamesSnapshot int

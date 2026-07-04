@@ -1,0 +1,71 @@
+# ==============================
+# Environment / Secrets
+# ==============================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ==============================
+# Go (chessfut-be)
+# ==============================
+chessfut-be/chessfut-be
+chessfut-be/bin/
+chessfut-be/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# ==============================
+# Node / Next.js (chessfut-fe)
+# ==============================
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+.turbo/
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ==============================
+# Docker
+# ==============================
+*.log
+docker-compose.override.yaml
+
+# ==============================
+# Editor / IDE
+# ==============================
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ==============================
+# OS
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Coverage / test artifacts
+# ==============================
+coverage/
+coverage.out
+coverage.html
+*.cover

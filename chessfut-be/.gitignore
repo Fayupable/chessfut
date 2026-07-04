@@ -1,0 +1,5 @@
+.env
+chessfut-be
+*.exe
+.idea/
+.vscode/

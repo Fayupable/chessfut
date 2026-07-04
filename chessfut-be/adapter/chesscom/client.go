@@ -23,14 +23,14 @@ type Client struct {
 	userAgent  string
 }
 
-func (c *Client) GetLeaderboards(ctx context.Context) (domain.Leaderboards, error) {
-	var resp leaderboardsResponse
-	url := fmt.Sprintf("%s/leaderboards", baseURL)
-	if err := c.doRequest(ctx, url, &resp); err != nil {
-		return domain.Leaderboards{}, err
-	}
-	return mapLeaderboards(resp), nil
-}
+//func (c *Client) GetLeaderboards(ctx context.Context) (domain.Leaderboards, error) {
+//	var resp leaderboardsResponse
+//	url := fmt.Sprintf("%s/leaderboards", baseURL)
+//	if err := c.doRequest(ctx, url, &resp); err != nil {
+//		return domain.Leaderboards{}, err
+//	}
+//	return mapLeaderboards(resp), nil
+//}
 
 func (c *Client) GetGames(ctx context.Context, username string, from, to time.Time) ([]domain.Game, error) {
 	var archives archivesResponse
