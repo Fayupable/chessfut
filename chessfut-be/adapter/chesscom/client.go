@@ -66,7 +66,7 @@ func (c *Client) GetGames(ctx context.Context, username string, from, to time.Ti
 func NewClient(userAgent string) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 10 * time.Second},
-		limiter:    rate.NewLimiter(rate.Limit(2), 3),
+		limiter:    rate.NewLimiter(rate.Limit(1), 2),
 		userAgent:  userAgent,
 	}
 }
@@ -90,11 +90,22 @@ func (c *Client) doRequest(ctx context.Context, url string, target any) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		c.backOff()
+		return fmt.Errorf("chesscom: rate limited (429) for %s", url)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("chesscom: unexpected status %d for %s", resp.StatusCode, url)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+func (c *Client) backOff() {
+	c.limiter.SetLimit(rate.Limit(0.2))
+	time.AfterFunc(2*time.Minute, func() {
+		c.limiter.SetLimit(rate.Limit(1))
+	})
 }
 
 func (c *Client) fetchDeduped(ctx context.Context, key, url string, target any) error {

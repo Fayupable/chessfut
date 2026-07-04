@@ -42,7 +42,7 @@ func (s *GetFastCardService) Execute(ctx context.Context, username string) (doma
 		return card, nil
 	}
 
-	card, err := s.buildFastCard(ctx, username)
+	card, err := buildFastCard(ctx, s.chessComClient, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
@@ -55,13 +55,13 @@ func (s *GetFastCardService) Execute(ctx context.Context, username string) (doma
 	return card, nil
 }
 
-func (s *GetFastCardService) buildFastCard(ctx context.Context, username string) (domain.Card, error) {
-	player, err := s.chessComClient.GetProfile(ctx, username)
+func buildFastCard(ctx context.Context, client output.ChessComClientPort, username string) (domain.Card, error) {
+	player, err := client.GetProfile(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
 
-	stats, err := s.chessComClient.GetStats(ctx, username)
+	stats, err := client.GetStats(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
@@ -73,14 +73,15 @@ func (s *GetFastCardService) buildFastCard(ctx context.Context, username string)
 
 	now := time.Now()
 	return domain.Card{
-		Player:     player,
-		Stats:      stats,
-		CardType:   domain.CardTypeFast,
-		Tier:       tier,
-		OVR:        CalculateOVR(stats),
-		Badges:     AssignBadges(player, stats),
-		ComputedAt: now,
-		ExpiresAt:  now.Add(cardTTL),
+		Player:        player,
+		Stats:         stats,
+		CardType:      domain.CardTypeFast,
+		Tier:          tier,
+		OVR:           CalculateOVR(stats),
+		Badges:        AssignBadges(player, stats),
+		GamesSnapshot: domain.TotalGames(stats),
+		ComputedAt:    now,
+		ExpiresAt:     now.Add(cardTTL),
 	}, nil
 }
 

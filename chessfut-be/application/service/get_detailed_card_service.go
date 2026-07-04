@@ -10,6 +10,7 @@ import (
 )
 
 const detailedGamesWindow = 2 * 30 * 24 * time.Hour
+const minGamesDeltaForRebuild = 50
 
 type GetDetailedCardService struct {
 	chessComClient output.ChessComClientPort
@@ -32,23 +33,58 @@ func NewGetDetailedCardService(
 var _ input.GetDetailedCardUseCase = (*GetDetailedCardService)(nil)
 
 func (s *GetDetailedCardService) Execute(ctx context.Context, username string) (domain.Card, error) {
-	if card, found, err := s.cache.GetCard(ctx, username); err == nil && found && !card.IsExpired() && card.CardType == domain.CardTypeDetailed {
+	if card, ok := s.tryCache(ctx, username); ok {
 		return card, nil
 	}
 
-	if card, found, err := s.cardRepository.FindByUsername(ctx, username); err == nil && found && !card.IsExpired() && card.CardType == domain.CardTypeDetailed {
-		return card, nil
+	existing, found, err := s.cardRepository.FindByUsername(ctx, username)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	if found && existing.CardType == domain.CardTypeDetailed {
+		_ = s.cache.SetCard(ctx, existing)
+		return existing, nil
 	}
 
+	return s.rebuild(ctx, username)
+}
+
+func (s *GetDetailedCardService) tryCache(ctx context.Context, username string) (domain.Card, bool) {
+	card, found, err := s.cache.GetCard(ctx, username)
+	if err != nil || !found || card.IsExpired() || card.CardType != domain.CardTypeDetailed {
+		return domain.Card{}, false
+	}
+	return card, true
+}
+
+func (s *GetDetailedCardService) tryTouch(ctx context.Context, username string, existing domain.Card) (domain.Card, bool) {
+	freshStats, err := s.chessComClient.GetStats(ctx, username)
+	if err != nil {
+		return domain.Card{}, false
+	}
+
+	delta := domain.TotalGames(freshStats) - existing.GamesSnapshot
+	if delta >= minGamesDeltaForRebuild {
+		return domain.Card{}, false
+	}
+
+	touched := existing
+	touched.Stats = freshStats
+	touched.ExpiresAt = time.Now().Add(cardTTL)
+	if err := s.cardRepository.Save(ctx, touched); err != nil {
+		return domain.Card{}, false
+	}
+	return touched, true
+}
+
+func (s *GetDetailedCardService) rebuild(ctx context.Context, username string) (domain.Card, error) {
 	card, err := s.buildDetailedCard(ctx, username)
 	if err != nil {
 		return domain.Card{}, err
 	}
-
 	if err := s.cardRepository.Save(ctx, card); err != nil {
 		return domain.Card{}, err
 	}
-
 	return card, nil
 }
 
@@ -77,15 +113,16 @@ func (s *GetDetailedCardService) buildDetailedCard(ctx context.Context, username
 
 	now := time.Now()
 	return domain.Card{
-		Player:      player,
-		Stats:       stats,
-		CardType:    domain.CardTypeDetailed,
-		Tier:        tier,
-		OVR:         CalculateOVR(stats),
-		PlayStyle:   DeterminePlayStyle(games),
-		Badges:      AssignBadges(player, stats),
-		TopOpenings: aggregateTopOpenings(games),
-		ComputedAt:  now,
-		ExpiresAt:   now.Add(cardTTL),
+		Player:        player,
+		Stats:         stats,
+		CardType:      domain.CardTypeDetailed,
+		Tier:          tier,
+		OVR:           CalculateOVR(stats),
+		PlayStyle:     DeterminePlayStyle(games),
+		Badges:        AssignBadges(player, stats),
+		TopOpenings:   aggregateTopOpenings(games),
+		GamesSnapshot: domain.TotalGames(stats),
+		ComputedAt:    now,
+		ExpiresAt:     now.Add(cardTTL),
 	}, nil
 }
