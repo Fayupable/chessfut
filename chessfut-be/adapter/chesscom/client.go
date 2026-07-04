@@ -83,7 +83,7 @@ func (c *Client) doRequest(ctx context.Context, url string, target any) error {
 		slog.Error("chesscom_request", "url", url, "error", err.Error(), "duration_ms", time.Since(start).Milliseconds())
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	slog.Info("chesscom_request",
 		"url", url,
