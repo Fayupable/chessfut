@@ -152,3 +152,52 @@ func (r *CardRepository) FindTopByOVR(ctx context.Context, limit int) ([]domain.
 
 	return cards, rows.Err()
 }
+
+func (r *CardRepository) CountAll(ctx context.Context) (int, error) {
+	const query = `SELECT COUNT(*) FROM player_cards`
+
+	var count int
+	if err := r.pool.QueryRow(ctx, query).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *CardRepository) SearchByUsername(ctx context.Context, prefix string, limit, offset int) ([]domain.Card, error) {
+	const query = `
+		SELECT card_data, card_type, tier, computed_at, expires_at
+		FROM player_cards
+		WHERE username ILIKE $1 || '%'
+		ORDER BY username ASC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.pool.Query(ctx, query, prefix, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	for rows.Next() {
+		var (
+			rawData        []byte
+			cardType, tier string
+			computedAt     time.Time
+			expiresAt      time.Time
+		)
+
+		if err := rows.Scan(&rawData, &cardType, &tier, &computedAt, &expiresAt); err != nil {
+			return nil, err
+		}
+
+		var model cardDataModel
+		if err := json.Unmarshal(rawData, &model); err != nil {
+			return nil, err
+		}
+
+		cards = append(cards, fromCardDataModel(model, cardType, tier, computedAt, expiresAt))
+	}
+
+	return cards, rows.Err()
+}

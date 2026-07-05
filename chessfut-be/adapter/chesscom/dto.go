@@ -24,12 +24,27 @@ type statsRecord struct {
 	} `json:"record"`
 }
 
+type tacticsResponse struct {
+	Highest struct {
+		Rating int `json:"rating"`
+	} `json:"highest"`
+}
+
+type puzzleRushResponse struct {
+	Best struct {
+		TotalAttempts int `json:"total_attempts"`
+		Score         int `json:"score"`
+	} `json:"best"`
+}
+
 type statsResponse struct {
-	ChessDaily  statsRecord `json:"chess_daily"`
-	ChessRapid  statsRecord `json:"chess_rapid"`
-	ChessBullet statsRecord `json:"chess_bullet"`
-	ChessBlitz  statsRecord `json:"chess_blitz"`
-	Fide        int         `json:"fide"`
+	ChessDaily  statsRecord        `json:"chess_daily"`
+	ChessRapid  statsRecord        `json:"chess_rapid"`
+	ChessBullet statsRecord        `json:"chess_bullet"`
+	ChessBlitz  statsRecord        `json:"chess_blitz"`
+	Fide        int                `json:"fide"`
+	Tactics     tacticsResponse    `json:"tactics"`
+	PuzzleRush  puzzleRushResponse `json:"puzzle_rush"`
 }
 
 type archivesResponse struct {

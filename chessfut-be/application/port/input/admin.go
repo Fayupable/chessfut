@@ -17,3 +17,7 @@ type SyncTitledPlayersUseCase interface {
 type RefreshStaleCardsUseCase interface {
 	Execute(ctx context.Context, batchSize int) (int, error)
 }
+
+type GetStatsUseCase interface {
+	Execute(ctx context.Context) (int, error)
+}

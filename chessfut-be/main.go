@@ -42,10 +42,11 @@ func main() {
 		Addr:     cfg.RedisAddr,
 		Password: cfg.RedisPassword,
 	})
-	defer func() { _ = redisClient.Close() }()
+	defer redisClient.Close()
 
 	chessComClient := chesscom.NewClient(cfg.ChessComUserAgent, cfg.ChessComBaseURL)
 	cardRepository := postgres.NewCardRepository(pool)
+	cache := redisadapter.NewCache(redisClient)
 
 	postgresChecker := health.NewChecker("postgres", func(ctx context.Context) error {
 		return pool.Ping(ctx)
@@ -55,22 +56,25 @@ func main() {
 	})
 	postgresChecker.Start(ctx)
 	redisChecker.Start(ctx)
-	cache := redisadapter.NewCache(redisClient)
 
 	getFastCard := service.NewGetFastCardService(chessComClient, cardRepository, cache)
 	getDetailedCard := service.NewGetDetailedCardService(chessComClient, cardRepository, cache)
 	getLeaderboard := service.NewGetLeaderboardService(cardRepository)
+	getStats := service.NewGetStatsService(cardRepository, cache)
+	searchPlayers := service.NewSearchPlayersService(cardRepository)
 	refreshCard := service.NewRefreshCardService(chessComClient, cardRepository, cache)
 	syncTitledPlayers := service.NewSyncTitledPlayersService(chessComClient, cardRepository)
 	refreshStaleCards := service.NewRefreshStaleCardsService(chessComClient, cardRepository, cache)
 
-	cardHandler := httpadapter.NewCardHandler(getFastCard, getDetailedCard, getLeaderboard)
+	cardHandler := httpadapter.NewCardHandler(getFastCard, getDetailedCard, getLeaderboard, getStats, searchPlayers)
 	adminHandler := httpadapter.NewAdminHandler(refreshCard, syncTitledPlayers, refreshStaleCards)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.LoggingMiddleware(cardHandler.GetFastCard))
-	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.LoggingMiddleware(cardHandler.GetDetailedCard))
-	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.LoggingMiddleware(cardHandler.GetLeaderboard))
+	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetFastCard)))
+	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetDetailedCard)))
+	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetLeaderboard)))
+	mux.HandleFunc("GET /api/v1/stats", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetStats)))
+	mux.HandleFunc("GET /api/v1/search", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.SearchPlayers)))
 
 	mux.HandleFunc("POST /api/admin/refresh/{username}", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshCard)))
 	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers)))

@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/fayupable/chessfut-be/application/port/input"
 	"github.com/fayupable/chessfut-be/application/port/output"
 	"github.com/fayupable/chessfut-be/domain"
@@ -16,6 +18,7 @@ type GetDetailedCardService struct {
 	chessComClient output.ChessComClientPort
 	cardRepository output.CardRepositoryPort
 	cache          output.CachePort
+	group          singleflight.Group
 }
 
 func NewGetDetailedCardService(
@@ -57,16 +60,43 @@ func (s *GetDetailedCardService) tryCache(ctx context.Context, username string) 
 	return card, true
 }
 
+// rebuild is guarded by singleflight so concurrent requests for the same
+// never-before-seen username (e.g. from the homepage card fan and a direct
+// page visit firing at once) share a single chess.com fetch instead of each
+// independently hammering the API.
 func (s *GetDetailedCardService) rebuild(ctx context.Context, username string) (domain.Card, error) {
-	card, err := buildDetailedCard(ctx, s.chessComClient, username)
+	result, err, _ := s.group.Do(username, func() (any, error) {
+		card, err := buildDetailedCard(ctx, s.chessComClient, username)
+		if err != nil {
+			return domain.Card{}, err
+		}
+		if err := s.cardRepository.Save(ctx, card); err != nil {
+			return domain.Card{}, err
+		}
+		return card, nil
+	})
 	if err != nil {
 		return domain.Card{}, err
 	}
-	if err := s.cardRepository.Save(ctx, card); err != nil {
-		return domain.Card{}, err
-	}
+
+	card := result.(domain.Card)
 	s.promoteIfPopular(ctx, username, card)
 	return card, nil
+}
+
+func (s *GetDetailedCardService) promoteIfPopular(ctx context.Context, username string, card domain.Card) {
+	if card.Player.HasFideTitle() {
+		_ = s.cache.SetCard(ctx, card)
+		return
+	}
+
+	count, err := s.cache.IncrementViewCount(ctx, username)
+	if err != nil {
+		return
+	}
+	if count >= viewPromotionThreshold {
+		_ = s.cache.SetCard(ctx, card)
+	}
 }
 
 func buildDetailedCard(ctx context.Context, client output.ChessComClientPort, username string) (domain.Card, error) {
@@ -92,35 +122,26 @@ func buildDetailedCard(ctx context.Context, client output.ChessComClientPort, us
 		tier = domain.CardTierTitled
 	}
 
-	now := time.Now()
 	playStyle := DeterminePlayStyle(games)
+	topOpenings := aggregateTopOpenings(games)
+	gamesSnapshot := domain.TotalGames(stats)
+	attributes, position, ovr, workRate := BuildCardScoring(player, stats, topOpenings, games, gamesSnapshot)
+
+	now := time.Now()
 	return domain.Card{
 		Player:        player,
 		Stats:         stats,
 		CardType:      domain.CardTypeDetailed,
 		Tier:          tier,
-		OVR:           CalculateOVR(stats),
+		OVR:           ovr,
 		PlayStyle:     playStyle,
-		Position:      domain.MapToPosition(playStyle),
+		Position:      position,
+		Attributes:    attributes,
+		WorkRate:      workRate,
 		Badges:        AssignBadges(player, stats),
-		TopOpenings:   aggregateTopOpenings(games),
-		GamesSnapshot: domain.TotalGames(stats),
+		TopOpenings:   topOpenings,
+		GamesSnapshot: gamesSnapshot,
 		ComputedAt:    now,
 		ExpiresAt:     now.Add(cardTTL),
 	}, nil
-}
-
-func (s *GetDetailedCardService) promoteIfPopular(ctx context.Context, username string, card domain.Card) {
-	if card.Player.HasFideTitle() {
-		_ = s.cache.SetCard(ctx, card)
-		return
-	}
-
-	count, err := s.cache.IncrementViewCount(ctx, username)
-	if err != nil {
-		return
-	}
-	if count >= viewPromotionThreshold {
-		_ = s.cache.SetCard(ctx, card)
-	}
 }

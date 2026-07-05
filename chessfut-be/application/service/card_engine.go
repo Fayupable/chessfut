@@ -1,1 +1,278 @@
 package service
+
+import (
+	"math"
+
+	"github.com/fayupable/chessfut-be/domain"
+)
+
+const (
+	idxPac = iota
+	idxSho
+	idxPas
+	idxDri
+	idxDef
+	idxPhy
+	statCount
+)
+
+const (
+	elasticAlpha = 0.4
+	statFloor    = 10.0
+	statCeiling  = 99.0
+
+	fideX0    = 2500.0
+	fideK     = 0.0084
+	fideBase  = 50.0
+	fideRange = 49.0
+
+	chesscomX0    = 2600.0
+	chesscomK     = 0.0045
+	chesscomBase  = 30.0
+	chesscomRange = 65.0
+
+	fideWeight = 0.8
+
+	longGameMoves = 80.0
+)
+
+func clampFloat(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+func mean(v []float64) float64 {
+	sum := 0.0
+	for _, x := range v {
+		sum += x
+	}
+	return sum / float64(len(v))
+}
+
+func sigmoid(z float64) float64 {
+	return 1 / (1 + math.Exp(-z))
+}
+
+// BuildCardScoring anchors the whole scoring pipeline to a player's *verified*
+// strength: FIDE rating when available (the authoritative, tightly-banded
+// real-world measure), falling back to chess.com's own rating scale otherwise.
+// Every attribute is elastically shaped around that anchor, so two GMs with
+// genuinely different real-world strength (e.g. FIDE 2500 vs 2800) land at
+// meaningfully different OVRs instead of both saturating at the cap.
+func BuildCardScoring(
+	player domain.Player,
+	stats domain.PlayerStats,
+	topOpenings []domain.OpeningStat,
+	games []domain.Game,
+	gamesSnapshot int,
+) (domain.Attributes, domain.Position, int, domain.WorkRate) {
+	raw := rawAttributeValues(stats, topOpenings, gamesSnapshot)
+
+	center := anchorScore(player.Title, stats)
+	attrs := elasticShape(raw, center)
+
+	drawRate := blitzDrawRate(stats.Blitz)
+	aggression := aggressionSignal(games)
+
+	position, family := positionFromVectors(attrs, drawRate, aggression, avgGameLength(games))
+	baseOVR := weightedOVR(attrs, family)
+
+	nudge := titleNudge(player.Title)
+	ovr := int(clampFloat(math.Round(float64(baseOVR)+nudge*(99-float64(baseOVR))/99), 1, 99))
+
+	workRate := CalculateWorkRate(attrs)
+
+	return attrs, position, ovr, workRate
+}
+
+func rawAttributeValues(stats domain.PlayerStats, topOpenings []domain.OpeningStat, gamesSnapshot int) [statCount]float64 {
+	var raw [statCount]float64
+
+	speed := 0.6*float64(stats.Bullet.Rating) + 0.4*float64(stats.Blitz.Rating)
+	raw[idxPac] = clampFloat(10+(speed-100)/30, statFloor, statCeiling)
+
+	raw[idxSho] = clampFloat(stats.Blitz.WinRate()*1.5+10, statFloor, statCeiling)
+
+	raw[idxPas] = clampFloat(10+(float64(stats.Rapid.Rating)-100)/30, statFloor, statCeiling)
+
+	raw[idxDri] = technicalScore(stats, topOpenings)
+
+	total := stats.Blitz.TotalGames()
+	nonLoss := 0.0
+	if total > 0 {
+		nonLoss = float64(stats.Blitz.Wins+stats.Blitz.Draws) / float64(total) * 130
+	}
+	raw[idxDef] = clampFloat(nonLoss, statFloor, statCeiling)
+
+	raw[idxPhy] = clampFloat(math.Log(float64(gamesSnapshot)+1)/math.Log(100000)*99, statFloor, statCeiling)
+
+	return raw
+}
+
+func technicalScore(stats domain.PlayerStats, topOpenings []domain.OpeningStat) float64 {
+	components := []float64{openingDiversity(topOpenings)}
+
+	if stats.TacticsRating > 0 {
+		components = append(components, normalize(stats.TacticsRating, chesscomMin, chesscomMax))
+	}
+	if stats.PuzzleRushAccuracy > 0 {
+		components = append(components, clampFloat(stats.PuzzleRushAccuracy, 0, 99))
+	}
+
+	return clampFloat(mean(components), statFloor, statCeiling)
+}
+
+func peakRating(stats domain.PlayerStats) float64 {
+	peak := math.Max(float64(stats.Bullet.Rating), float64(stats.Blitz.Rating))
+	return math.Max(peak, float64(stats.Rapid.Rating))
+}
+
+// effectiveFideRating falls back to the title's minimum norm rating when
+// chess.com doesn't have the player's FIDE rating linked, so a verified title
+// still counts for something instead of being treated as fully unrated.
+func effectiveFideRating(title domain.Title, fideRating int) int {
+	if fideRating > 0 {
+		return fideRating
+	}
+
+	switch title {
+	case domain.TitleGM, domain.TitleWGM:
+		return 2500
+	case domain.TitleIM, domain.TitleWIM:
+		return 2400
+	case domain.TitleFM, domain.TitleWFM:
+		return 2300
+	case domain.TitleCM, domain.TitleWCM:
+		return 2200
+	default:
+		return 0
+	}
+}
+
+// anchorScore is the single "how strong is this player, really" number that
+// everything else (attribute shaping, OVR) is built around. FIDE dominates
+// when present (or assumed from title) since it's independently verified and
+// tightly banded; chess.com activity contributes a smaller nudge on top.
+// Without FIDE or a title, chess.com rating alone drives it — no hard
+// ceiling, a genuinely strong untitled player can still land high.
+func anchorScore(title domain.Title, stats domain.PlayerStats) float64 {
+	chesscomScore := chesscomBase + chesscomRange/(1+math.Exp(-chesscomK*(peakRating(stats)-chesscomX0)))
+
+	fide := effectiveFideRating(title, stats.FideRating)
+	if fide <= 0 {
+		return chesscomScore
+	}
+
+	fideScore := fideBase + fideRange/(1+math.Exp(-fideK*(float64(fide)-fideX0)))
+	return fideWeight*fideScore + (1-fideWeight)*chesscomScore
+}
+
+func elasticShape(raw [statCount]float64, center float64) domain.Attributes {
+	m := mean(raw[:])
+
+	shape := func(x float64) int {
+		return int(math.Round(clampFloat(center+elasticAlpha*(x-m), statFloor, statCeiling)))
+	}
+
+	return domain.Attributes{
+		Pac: shape(raw[idxPac]),
+		Sho: shape(raw[idxSho]),
+		Pas: shape(raw[idxPas]),
+		Dri: shape(raw[idxDri]),
+		Def: shape(raw[idxDef]),
+		Phy: shape(raw[idxPhy]),
+	}
+}
+
+func blitzDrawRate(tc domain.TimeControlStats) float64 {
+	total := tc.TotalGames()
+	if total == 0 {
+		return 0
+	}
+	return float64(tc.Draws) / float64(total)
+}
+
+func avgGameLength(games []domain.Game) float64 {
+	if len(games) == 0 {
+		return longGameMoves / 2
+	}
+	total := 0
+	for _, g := range games {
+		total += g.MovesCount
+	}
+	return float64(total) / float64(len(games))
+}
+
+func aggressionSignal(games []domain.Game) float64 {
+	if len(games) == 0 {
+		return 0.5
+	}
+
+	decisive := 0
+	for _, g := range games {
+		if g.Result != domain.ResultDraw {
+			decisive++
+		}
+	}
+	decisiveRate := float64(decisive) / float64(len(games))
+
+	shortGame := clampFloat(1-avgGameLength(games)/60, 0, 1)
+
+	return 0.5*shortGame + 0.5*decisiveRate
+}
+
+func positionFromVectors(attrs domain.Attributes, drawRate, aggression, avgMoves float64) (domain.Position, string) {
+	attack := 0.5*float64(attrs.Sho) + 0.3*float64(attrs.Pac) + 0.2*(aggression*99)
+	playmaker := 0.4*float64(attrs.Pas) + 0.4*float64(attrs.Dri) + 0.2*((1-drawRate)*99)
+	anchor := 0.6*float64(attrs.Def) + 0.2*(drawRate*99) + 0.2*((1-clampFloat(avgMoves/longGameMoves, 0, 1))*99)
+
+	switch {
+	case attack >= playmaker && attack >= anchor:
+		return domain.PositionForward, "forward"
+	case playmaker >= anchor:
+		if attrs.Dri >= attrs.Pas {
+			return domain.PositionAllRounder, "playmaker"
+		}
+		return domain.PositionMidfielder, "playmaker"
+	default:
+		return domain.PositionDefender, "anchor"
+	}
+}
+
+func weightedOVR(attrs domain.Attributes, family string) int {
+	weights := map[string][statCount]float64{
+		"forward":   {0.30, 0.40, 0.10, 0.20, 0.00, 0.00},
+		"playmaker": {0.20, 0.00, 0.30, 0.30, 0.20, 0.00},
+		"anchor":    {0.00, 0.00, 0.20, 0.00, 0.50, 0.30},
+	}[family]
+
+	vals := [statCount]float64{
+		float64(attrs.Pac), float64(attrs.Sho), float64(attrs.Pas),
+		float64(attrs.Dri), float64(attrs.Def), float64(attrs.Phy),
+	}
+
+	sum := 0.0
+	for i, w := range weights {
+		sum += vals[i] * w
+	}
+
+	return int(math.Round(sum))
+}
+
+func titleNudge(title domain.Title) float64 {
+	switch title {
+	case domain.TitleGM, domain.TitleWGM:
+		return 3
+	case domain.TitleIM, domain.TitleWIM:
+		return 2
+	case domain.TitleFM, domain.TitleWFM:
+		return 1
+	default:
+		return 0
+	}
+}

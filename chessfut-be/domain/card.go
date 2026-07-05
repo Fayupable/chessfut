@@ -35,6 +35,28 @@ const (
 	BadgeGiantSlayer Badge = "giant_slayer"
 )
 
+type Attributes struct {
+	Pac int
+	Sho int
+	Pas int
+	Dri int
+	Def int
+	Phy int
+}
+
+type WorkRateLevel string
+
+const (
+	WorkRateHigh WorkRateLevel = "High"
+	WorkRateMed  WorkRateLevel = "Med"
+	WorkRateLow  WorkRateLevel = "Low"
+)
+
+type WorkRate struct {
+	Attack  WorkRateLevel
+	Defense WorkRateLevel
+}
+
 type Card struct {
 	Player        Player
 	Stats         PlayerStats
@@ -43,6 +65,8 @@ type Card struct {
 	OVR           int
 	PlayStyle     PlayStyle
 	Position      Position
+	Attributes    Attributes
+	WorkRate      WorkRate
 	Badges        []Badge
 	TopOpenings   []OpeningStat
 	GamesSnapshot int

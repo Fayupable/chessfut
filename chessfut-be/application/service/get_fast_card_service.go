@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/fayupable/chessfut-be/application/port/input"
 	"github.com/fayupable/chessfut-be/application/port/output"
 	"github.com/fayupable/chessfut-be/domain"
@@ -16,6 +18,7 @@ type GetFastCardService struct {
 	chessComClient output.ChessComClientPort
 	cardRepository output.CardRepositoryPort
 	cache          output.CachePort
+	group          singleflight.Group
 }
 
 func NewGetFastCardService(
@@ -46,15 +49,21 @@ func (s *GetFastCardService) Execute(ctx context.Context, username string) (doma
 		return existing, nil
 	}
 
-	card, err := buildFastCard(ctx, s.chessComClient, username)
+	result, err, _ := s.group.Do(username, func() (any, error) {
+		card, err := buildFastCard(ctx, s.chessComClient, username)
+		if err != nil {
+			return domain.Card{}, err
+		}
+		if err := s.cardRepository.Save(ctx, card); err != nil {
+			return domain.Card{}, err
+		}
+		return card, nil
+	})
 	if err != nil {
 		return domain.Card{}, err
 	}
 
-	if err := s.cardRepository.Save(ctx, card); err != nil {
-		return domain.Card{}, err
-	}
-
+	card := result.(domain.Card)
 	s.promoteIfPopular(ctx, username, card)
 	return card, nil
 }
@@ -75,16 +84,21 @@ func buildFastCard(ctx context.Context, client output.ChessComClientPort, userna
 		tier = domain.CardTierTitled
 	}
 
+	gamesSnapshot := domain.TotalGames(stats)
+	attributes, position, ovr, workRate := BuildCardScoring(player, stats, nil, nil, gamesSnapshot)
+
 	now := time.Now()
 	return domain.Card{
 		Player:        player,
 		Stats:         stats,
 		CardType:      domain.CardTypeFast,
 		Tier:          tier,
-		OVR:           CalculateOVR(stats),
-		Position:      domain.PositionAllRounder,
+		OVR:           ovr,
+		Position:      position,
+		Attributes:    attributes,
+		WorkRate:      workRate,
 		Badges:        AssignBadges(player, stats),
-		GamesSnapshot: domain.TotalGames(stats),
+		GamesSnapshot: gamesSnapshot,
 		ComputedAt:    now,
 		ExpiresAt:     now.Add(cardTTL),
 	}, nil

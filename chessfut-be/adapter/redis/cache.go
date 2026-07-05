@@ -14,6 +14,8 @@ import (
 
 const viewCounterWindow = 1 * time.Hour
 const minCacheTTL = 10 * time.Minute
+const totalCardsCacheTTL = 20 * time.Minute
+const totalCardsCacheKey = "stats:total_cards"
 
 type Cache struct {
 	client *redislib.Client
@@ -84,4 +86,19 @@ func (c *Cache) SetCard(ctx context.Context, card domain.Card) error {
 	}
 
 	return c.client.Set(ctx, cardKey(card.Player.Username), data, ttl).Err()
+}
+
+func (c *Cache) GetTotalCardsCount(ctx context.Context) (int, bool, error) {
+	val, err := c.client.Get(ctx, totalCardsCacheKey).Int()
+	if errors.Is(err, redislib.Nil) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return val, true, nil
+}
+
+func (c *Cache) SetTotalCardsCount(ctx context.Context, count int) error {
+	return c.client.Set(ctx, totalCardsCacheKey, count, totalCardsCacheTTL).Err()
 }
