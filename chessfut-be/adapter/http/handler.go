@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	defaultLeaderboardLimit = 50
-	maxLeaderboardLimit     = 100
+	defaultLeaderboardLimit = 20
+	maxLeaderboardLimit     = 50
 	defaultSearchLimit      = 10
 	maxSearchLimit          = 50
 )
@@ -66,8 +66,9 @@ func (h *CardHandler) GetDetailedCard(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	limit := parseBoundedLimit(r, defaultLeaderboardLimit, maxLeaderboardLimit)
+	offset := parseOffset(r)
 
-	cards, err := h.getLeaderboard.Execute(r.Context(), limit)
+	cards, err := h.getLeaderboard.Execute(r.Context(), limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err, "failed to load leaderboard")
 		return
@@ -99,13 +100,7 @@ func (h *CardHandler) SearchPlayers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limit := parseBoundedLimit(r, defaultSearchLimit, maxSearchLimit)
-
-	offset := 0
-	if raw := r.URL.Query().Get("offset"); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
-			offset = parsed
-		}
-	}
+	offset := parseOffset(r)
 
 	cards, err := h.searchPlayers.Execute(r.Context(), query, limit, offset)
 	if err != nil {
@@ -134,12 +129,24 @@ func parseBoundedLimit(r *http.Request, defaultLimit, maxLimit int) int {
 	return limit
 }
 
+func parseOffset(r *http.Request) int {
+	offset := 0
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+	return offset
+}
+
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
 }
 
+// writeError logs the real, potentially sensitive error server-side and
+// returns only a fixed public-facing message to the client.
 func writeError(w http.ResponseWriter, status int, err error, publicMessage string) {
 	slog.Error("request_failed", "status", status, "error", err.Error())
 	writeJSON(w, status, map[string]string{"error": publicMessage})

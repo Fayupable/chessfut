@@ -18,8 +18,8 @@ export function getDetailedCard(username: string): Promise<Card> {
     return fetchJSON<Card>(`/player/${username}/detailed`);
 }
 
-export function getLeaderboard(limit = 50): Promise<LeaderboardResponse> {
-    return fetchJSON<LeaderboardResponse>(`/leaderboard?limit=${limit}`);
+export function getLeaderboard(limit = 20, offset = 0): Promise<LeaderboardResponse> {
+    return fetchJSON<LeaderboardResponse>(`/leaderboard?limit=${limit}&offset=${offset}`);
 }
 
 export function getStats(): Promise<{ total_cards: number }> {

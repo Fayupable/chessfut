@@ -1,0 +1,17 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.CHESSFUT_SSH_HOST }}
+          username: ${{ secrets.CHESSFUT_SSH_USER }}
+          key: ${{ secrets.CHESSFUT_SSH_SERVER }}
+          script: exit

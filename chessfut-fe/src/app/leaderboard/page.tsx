@@ -9,8 +9,19 @@ export const metadata: Metadata = {
     description: "Top-rated Chess.com players, ranked by OVR on Chessfut.",
 };
 
-export default async function LeaderboardPage() {
-    const { leaderboard } = await getLeaderboard(50);
+const PAGE_SIZE = 20;
+
+export default async function LeaderboardPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ page?: string }>;
+}) {
+    const { page: pageParam } = await searchParams;
+    const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+    const offset = (page - 1) * PAGE_SIZE;
+
+    const { leaderboard } = await getLeaderboard(PAGE_SIZE, offset);
+    const hasNextPage = leaderboard.length === PAGE_SIZE;
 
     return (
         <div className="min-h-screen bg-neutral-900">
@@ -27,7 +38,7 @@ export default async function LeaderboardPage() {
                             href={`/${card.username}`}
                             className="flex items-center gap-4 rounded-lg border border-white/10 bg-neutral-800 px-4 py-3 hover:bg-neutral-700"
                         >
-                            <span className="w-8 text-right text-white/40">{i + 1}</span>
+                            <span className="w-8 text-right text-white/40">{offset + i + 1}</span>
                             <img src={card.avatar} alt={card.username} className="h-10 w-10 rounded-full object-cover" />
                             <div className="flex-1">
                                 <p className="font-semibold">{card.name || card.username}</p>
@@ -40,6 +51,30 @@ export default async function LeaderboardPage() {
                         </Link>
                     ))
                 )}
+
+                <div className="mt-4 flex items-center justify-between">
+                    {page > 1 ? (
+                        <Link
+                            href={`/leaderboard?page=${page - 1}`}
+                            className="rounded-md bg-neutral-800 px-4 py-2 text-sm font-semibold hover:bg-neutral-700"
+                        >
+                            &larr; Previous
+                        </Link>
+                    ) : (
+                        <span />
+                    )}
+                    <span className="text-sm text-white/40">Page {page}</span>
+                    {hasNextPage ? (
+                        <Link
+                            href={`/leaderboard?page=${page + 1}`}
+                            className="rounded-md bg-neutral-800 px-4 py-2 text-sm font-semibold hover:bg-neutral-700"
+                        >
+                            Next &rarr;
+                        </Link>
+                    ) : (
+                        <span />
+                    )}
+                </div>
             </main>
             <Footer />
         </div>
