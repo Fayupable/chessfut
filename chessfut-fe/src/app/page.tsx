@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getFastCard, getStats } from "@/lib/api";
 import { SearchForm } from "@/components/home/SearchForm";
 import { CardFan } from "@/components/home/CardFan";
@@ -45,13 +46,13 @@ export default async function HomePage() {
           <SearchForm />
           <p className="text-sm text-white/40">
             Example:{" "}
-            <a href="/hikaru" className="underline hover:text-white">
+            <Link href="/hikaru" className="underline hover:text-white">
               hikaru
-            </a>{" "}
+            </Link>{" "}
             ·{" "}
-            <a href="/fabianocaruana" className="underline hover:text-white">
+            <Link href="/fabianocaruana" className="underline hover:text-white">
               fabianocaruana
-            </a>{" "}
+            </Link>{" "}
             · or your own
           </p>
           {totalCards !== null && (

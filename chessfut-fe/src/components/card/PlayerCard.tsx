@@ -2,8 +2,7 @@ import type { CSSProperties } from "react";
 import type { Card } from "@/types/card.types";
 import { resolveCardFrame } from "./tierStyles";
 import { CardFlag } from "./CardFlag";
-
-const pad2 = (n: number) => String(Math.round(n)).padStart(2, "0");
+import { pad2, formatDisplayName } from "./cardFormat";
 
 const STAT_CELLS: { key: keyof Card["attributes"]; label: string; vx: number; lx: number; vy: number; ly: number }[] = [
   { key: "pac", label: "PAC", vx: 21.3, lx: 32.41, vy: 64.63, ly: 65.24 },
@@ -28,8 +27,7 @@ const at = (left: number, top: number): CSSProperties => ({
 });
 
 export function PlayerCard({ card }: { card: Card }) {
-  const fullName = (card.name || card.username).trim();
-  const displayName = (fullName.length <= 9 ? fullName : fullName.split(" ").slice(-1)[0]).toUpperCase();
+  const displayName = formatDisplayName(card.name || card.username);
   const frame = resolveCardFrame(card.ovr);
 
   const wrap: CSSProperties = {

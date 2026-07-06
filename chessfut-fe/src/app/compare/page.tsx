@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import { getDetailedCard, getLeaderboard } from "@/lib/api";
 import { ComparisonResult } from "@/components/compare/ComparisonResult";
 import { CompareSearchForm } from "@/components/compare/CompareSearchForm";
 import { TopBar } from "@/components/layout/TopBar";
 import { Footer } from "@/components/layout/Footer";
 import type { Card } from "@/types/card.types";
+
+export const metadata: Metadata = {
+  title: "Compare Players",
+  description: "Compare two Chess.com players side by side — OVR, attributes, and stats.",
+};
 
 async function loadExamplePair(): Promise<[Card, Card] | null> {
   try {

@@ -8,8 +8,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - chessfut-net
     restart: unless-stopped
@@ -33,8 +31,6 @@ services:
       --requirepass ${REDIS_PASSWORD}
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -65,8 +61,10 @@ services:
       ADMIN_API_KEY: "${ADMIN_API_KEY:?ADMIN_API_KEY is required}"
       CHESSCOM_USER_AGENT: "${CHESSCOM_USER_AGENT:-chessfut/1.0 (contact: your-email@example.com)}"
       CHESSCOM_BASE_URL: "${CHESSCOM_BASE_URL:-https://api.chess.com/pub}"
-    ports:
-      - "8099:8099"
+      VIRTUAL_HOST: "api.chessfut.com"
+      VIRTUAL_PORT: "8099"
+      LETSENCRYPT_HOST: "api.chessfut.com"
+      LETSENCRYPT_EMAIL: "enisyaman4@gmail.com"
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +72,7 @@ services:
         condition: service_healthy
     networks:
       - chessfut-net
+      - nginx-proxy-net
     restart: unless-stopped
     deploy:
       resources:
@@ -89,10 +88,16 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}"
+    environment:
+      VIRTUAL_HOST: "chessfut.com,www.chessfut.com"
+      VIRTUAL_PORT: "3139"
+      LETSENCRYPT_HOST: "chessfut.com,www.chessfut.com"
+      LETSENCRYPT_EMAIL: "enisyaman4@gmail.com"
     depends_on:
       - chessfut-backend
     networks:
       - chessfut-net
+      - nginx-proxy-net
     restart: unless-stopped
     deploy:
       resources:
@@ -103,6 +108,9 @@ services:
 
 networks:
   chessfut-net:
+    driver: bridge
+  nginx-proxy-net:
+    name: nginx-proxy-net
     driver: bridge
 
 volumes:

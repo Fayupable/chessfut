@@ -22,8 +22,6 @@ export function UsernameAutocomplete({
 
   useEffect(() => {
     if (!value.trim()) {
-      setResults([]);
-      setOpen(false);
       return;
     }
 
@@ -66,6 +64,8 @@ export function UsernameAutocomplete({
     }
   };
 
+  const showDropdown = open && value.trim().length > 0 && results.length > 0;
+
   return (
     <div ref={containerRef} className="relative">
       <input
@@ -75,7 +75,7 @@ export function UsernameAutocomplete({
         placeholder={placeholder}
         className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-4 py-2 outline-none"
       />
-      {open && results.length > 0 && (
+      {showDropdown && (
         <div
           onScroll={handleScroll}
           className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-white/10 bg-neutral-800 shadow-lg"

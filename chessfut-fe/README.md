@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Chessfut — Frontend
+
+Turns your Chess.com stats into a FIFA Ultimate Team-style player card, rated out of 99.
+
+Built with Next.js 16 (App Router) and Tailwind CSS 4. Talks to the [`chessfut-be`](../chessfut-be) Go API for all data.
+
+## Features
+
+- **Player card** (`/[username]`) — OVR, six attributes (PAC/SHO/PAS/DRI/DEF/PHY), position, work rate, and badges rendered as a scalable card graphic
+- **Compare** (`/compare`) — side-by-side stat comparison between two players, with a live example pair shown by default
+- **Leaderboard** (`/leaderboard`) — top-rated players ranked by OVR
+- **Username autocomplete** — debounced, paginated search against the backend, database-only (not cached)
+- **Scouting metrics panel** — per-time-control ratings (bullet/blitz/rapid/daily), top openings, work rate
+
+## Tech Stack
+
+- Next.js 16 (App Router, Server Components for data fetching)
+- React 19
+- Tailwind CSS 4
+- Vitest + Testing Library (pure-function unit tests)
+- Docker (multi-stage build, standalone output, non-root runtime user)
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
+cp .env.example .env.local   # set NEXT_PUBLIC_API_URL to your backend URL
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable               | Required | Description                                      |
+|-------------------------|----------|---------------------------------------------------|
+| `NEXT_PUBLIC_API_URL`   | Yes      | Base URL of the `chessfut-be` API (e.g. `http://localhost:8099/api/v1`) |
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Command          | Description                          |
+|-------------------|---------------------------------------|
+| `npm run dev`     | Start the dev server                  |
+| `npm run build`   | Production build (`output: standalone`) |
+| `npm run start`   | Run the production build              |
+| `npm run lint`    | ESLint (Next.js core-web-vitals rules)|
+| `npm run test`    | Run the Vitest unit test suite        |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+src/
+├── app/                  # routes (/, /[username], /compare, /leaderboard)
+├── components/
+│   ├── card/             # PlayerCard rendering, tier/frame resolution, name/stat formatting
+│   ├── compare/           # comparison table and search
+│   ├── home/              # landing page pieces (search form, card fan, mascot)
+│   ├── layout/             # TopBar, Footer
+│   ├── panels/             # scouting metrics panel
+│   └── search/             # username autocomplete
+├── lib/api.ts             # typed fetch client for the backend
+└── types/card.types.ts    # mirrors the backend's card response shape
+```
 
-## Deploy on Vercel
+## Docker
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+docker build --build-arg NEXT_PUBLIC_API_URL=https://api.example.com -t chessfut-fe .
+docker run -p 3139:3139 chessfut-fe
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The image runs as a non-root user and exposes port `3139`.
+
+## Attribution
+
+Card frame and flag assets are adapted from [GitFut](https://github.com/Younesfdj/gitfut) (MIT License). See [THIRD_PARTY_LICENSES.md](./THIRD_PARTY_LICENSES.md) for details. No code was copied — only visual assets.

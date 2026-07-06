@@ -1,7 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getLeaderboard } from "@/lib/api";
 import { TopBar } from "@/components/layout/TopBar";
 import { Footer } from "@/components/layout/Footer";
+
+export const metadata: Metadata = {
+    title: "Leaderboard",
+    description: "Top-rated Chess.com players, ranked by OVR on Chessfut.",
+};
 
 export default async function LeaderboardPage() {
     const { leaderboard } = await getLeaderboard(50);
