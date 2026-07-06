@@ -115,15 +115,15 @@ func (r *CardRepository) FindStale(ctx context.Context, before time.Time, limit 
 	return cards, rows.Err()
 }
 
-func (r *CardRepository) FindTopByOVR(ctx context.Context, limit int) ([]domain.Card, error) {
+func (r *CardRepository) FindTopByOVR(ctx context.Context, limit, offset int) ([]domain.Card, error) {
 	const query = `
 		SELECT card_data, card_type, tier, computed_at, expires_at
 		FROM player_cards
 		ORDER BY (card_data->>'ovr')::int DESC
-		LIMIT $1
+		LIMIT $1 OFFSET $2
 	`
 
-	rows, err := r.pool.Query(ctx, query, limit)
+	rows, err := r.pool.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
 	}

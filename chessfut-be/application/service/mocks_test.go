@@ -52,8 +52,8 @@ func (m *mockCardRepository) FindStale(ctx context.Context, before time.Time, li
 	return args.Get(0).([]domain.Card), args.Error(1)
 }
 
-func (m *mockCardRepository) FindTopByOVR(ctx context.Context, limit int) ([]domain.Card, error) {
-	args := m.Called(ctx, limit)
+func (m *mockCardRepository) FindTopByOVR(ctx context.Context, limit, offset int) ([]domain.Card, error) {
+	args := m.Called(ctx, limit, offset)
 	return args.Get(0).([]domain.Card), args.Error(1)
 }
 

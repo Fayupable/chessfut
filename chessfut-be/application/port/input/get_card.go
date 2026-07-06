@@ -15,7 +15,7 @@ type GetDetailedCardUseCase interface {
 }
 
 type GetLeaderboardUseCase interface {
-	Execute(ctx context.Context, limit int) ([]domain.Card, error)
+	Execute(ctx context.Context, limit, offset int) ([]domain.Card, error)
 }
 
 type SearchPlayersUseCase interface {

@@ -18,6 +18,6 @@ func NewGetLeaderboardService(cardRepository output.CardRepositoryPort) *GetLead
 
 var _ input.GetLeaderboardUseCase = (*GetLeaderboardService)(nil)
 
-func (s *GetLeaderboardService) Execute(ctx context.Context, limit int) ([]domain.Card, error) {
-	return s.cardRepository.FindTopByOVR(ctx, limit)
+func (s *GetLeaderboardService) Execute(ctx context.Context, limit, offset int) ([]domain.Card, error) {
+	return s.cardRepository.FindTopByOVR(ctx, limit, offset)
 }

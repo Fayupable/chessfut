@@ -17,10 +17,10 @@ func TestGetLeaderboardService_Execute(t *testing.T) {
 	}
 
 	repo := new(mockCardRepository)
-	repo.On("FindTopByOVR", ctx, 50).Return(expected, nil)
+	repo.On("FindTopByOVR", ctx, 50, 0).Return(expected, nil)
 
 	svc := NewGetLeaderboardService(repo)
-	result, err := svc.Execute(ctx, 50)
+	result, err := svc.Execute(ctx, 50, 0)
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)

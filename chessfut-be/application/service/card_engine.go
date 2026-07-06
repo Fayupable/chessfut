@@ -36,6 +36,8 @@ const (
 	longGameMoves = 80.0
 )
 
+const maxPlausibleFideRating = 2900
+
 func clampFloat(v, lo, hi float64) float64 {
 	if v < lo {
 		return lo
@@ -130,9 +132,12 @@ func peakRating(stats domain.PlayerStats) float64 {
 
 // effectiveFideRating falls back to the title's minimum norm rating when
 // chess.com doesn't have the player's FIDE rating linked, so a verified title
-// still counts for something instead of being treated as fully unrated.
+// still counts for something instead of being treated as fully unrated. A
+// fide_rating above the real-world record (Carlsen's 2882) is untrustworthy
+// self-reported data, not a genuine rating — it's ignored entirely rather
+// than trusted-but-capped.
 func effectiveFideRating(title domain.Title, fideRating int) int {
-	if fideRating > 0 {
+	if fideRating > 0 && fideRating <= maxPlausibleFideRating {
 		return fideRating
 	}
 
