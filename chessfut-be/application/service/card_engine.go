@@ -160,9 +160,17 @@ func effectiveFideRating(title domain.Title, fideRating int) int {
 // when present (or assumed from title) since it's independently verified and
 // tightly banded; chess.com activity contributes a smaller nudge on top.
 // Without FIDE or a title, chess.com rating alone drives it — no hard
-// ceiling, a genuinely strong untitled player can still land high.
+// ceiling, a genuinely strong untitled player can still land high. A player
+// with zero recorded rating in every format (an unused/inactive account) is
+// floored well below the chesscom sigmoid's ~30 base, so a blank account can
+// never outrank someone with real game history.
 func anchorScore(title domain.Title, stats domain.PlayerStats) float64 {
-	chesscomScore := chesscomBase + chesscomRange/(1+math.Exp(-chesscomK*(peakRating(stats)-chesscomX0)))
+	peak := peakRating(stats)
+	if peak <= 0 {
+		return statFloor
+	}
+
+	chesscomScore := chesscomBase + chesscomRange/(1+math.Exp(-chesscomK*(peak-chesscomX0)))
 
 	fide := effectiveFideRating(title, stats.FideRating)
 	if fide <= 0 {
