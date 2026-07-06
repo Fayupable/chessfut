@@ -11,6 +11,7 @@ import (
 	"github.com/fayupable/chessfut-be/adapter/health"
 	"github.com/jackc/pgx/v5/pgxpool"
 	redislib "github.com/redis/go-redis/v9"
+	"golang.org/x/time/rate"
 
 	"github.com/fayupable/chessfut-be/adapter/chesscom"
 	httpadapter "github.com/fayupable/chessfut-be/adapter/http"
@@ -57,6 +58,8 @@ func main() {
 	postgresChecker.Start(ctx)
 	redisChecker.Start(ctx)
 
+	publicRateLimiter := httpadapter.NewRateLimiter(rate.Limit(5), 10)
+
 	getFastCard := service.NewGetFastCardService(chessComClient, cardRepository, cache)
 	getDetailedCard := service.NewGetDetailedCardService(chessComClient, cardRepository, cache)
 	getLeaderboard := service.NewGetLeaderboardService(cardRepository)
@@ -70,11 +73,11 @@ func main() {
 	adminHandler := httpadapter.NewAdminHandler(refreshCard, syncTitledPlayers, refreshStaleCards)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetFastCard)))
-	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetDetailedCard)))
-	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetLeaderboard)))
-	mux.HandleFunc("GET /api/v1/stats", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.GetStats)))
-	mux.HandleFunc("GET /api/v1/search", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(cardHandler.SearchPlayers)))
+	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetFastCard))))
+	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetDetailedCard))))
+	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetLeaderboard))))
+	mux.HandleFunc("GET /api/v1/stats", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetStats))))
+	mux.HandleFunc("GET /api/v1/search", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.SearchPlayers))))
 
 	mux.HandleFunc("POST /api/admin/refresh/{username}", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshCard)))
 	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers)))

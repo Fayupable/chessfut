@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -25,7 +26,7 @@ type Client struct {
 
 func (c *Client) GetGames(ctx context.Context, username string, from, to time.Time) ([]domain.Game, error) {
 	var archives archivesResponse
-	archivesURL := fmt.Sprintf("%s/player/%s/games/archives", c.baseURL, username)
+	archivesURL := fmt.Sprintf("%s/player/%s/games/archives", c.baseURL, url.PathEscape(username))
 	if err := c.doRequest(ctx, archivesURL, &archives); err != nil {
 		return nil, err
 	}
@@ -118,8 +119,8 @@ func (c *Client) fetchDeduped(ctx context.Context, key, url string, target any) 
 
 func (c *Client) GetProfile(ctx context.Context, username string) (domain.Player, error) {
 	var resp profileResponse
-	url := fmt.Sprintf("%s/player/%s", c.baseURL, username)
-	if err := c.fetchDeduped(ctx, "profile:"+username, url, &resp); err != nil {
+	reqURL := fmt.Sprintf("%s/player/%s", c.baseURL, url.PathEscape(username))
+	if err := c.fetchDeduped(ctx, "profile:"+username, reqURL, &resp); err != nil {
 		return domain.Player{}, err
 	}
 	return mapProfile(resp), nil
@@ -127,8 +128,8 @@ func (c *Client) GetProfile(ctx context.Context, username string) (domain.Player
 
 func (c *Client) GetStats(ctx context.Context, username string) (domain.PlayerStats, error) {
 	var resp statsResponse
-	url := fmt.Sprintf("%s/player/%s/stats", c.baseURL, username)
-	if err := c.fetchDeduped(ctx, "stats:"+username, url, &resp); err != nil {
+	reqURL := fmt.Sprintf("%s/player/%s/stats", c.baseURL, url.PathEscape(username))
+	if err := c.fetchDeduped(ctx, "stats:"+username, reqURL, &resp); err != nil {
 		return domain.PlayerStats{}, err
 	}
 	return mapStats(resp), nil
