@@ -23,25 +23,43 @@ type timeControlStatsModel struct {
 	Draws   int `json:"draws"`
 }
 
+type attributesModel struct {
+	Pac int `json:"pac"`
+	Sho int `json:"sho"`
+	Pas int `json:"pas"`
+	Dri int `json:"dri"`
+	Def int `json:"def"`
+	Phy int `json:"phy"`
+}
+
+type workRateModel struct {
+	Attack  string `json:"attack"`
+	Defense string `json:"defense"`
+}
+
 type cardDataModel struct {
-	Username      string                `json:"username"`
-	Name          string                `json:"name"`
-	Title         string                `json:"title"`
-	Avatar        string                `json:"avatar"`
-	Followers     int                   `json:"followers"`
-	CountryCode   string                `json:"country_code"`
-	JoinedAt      time.Time             `json:"joined_at"`
-	FideRating    int                   `json:"fide_rating"`
-	Bullet        timeControlStatsModel `json:"bullet"`
-	Blitz         timeControlStatsModel `json:"blitz"`
-	Rapid         timeControlStatsModel `json:"rapid"`
-	Daily         timeControlStatsModel `json:"daily"`
-	OVR           int                   `json:"ovr"`
-	PlayStyle     string                `json:"play_style"`
-	Position      string                `json:"position"`
-	Badges        []string              `json:"badges"`
-	TopOpenings   []openingStatModel    `json:"top_openings"`
-	GamesSnapshot int                   `json:"games_snapshot"`
+	Username           string                `json:"username"`
+	Name               string                `json:"name"`
+	Title              string                `json:"title"`
+	Avatar             string                `json:"avatar"`
+	Followers          int                   `json:"followers"`
+	CountryCode        string                `json:"country_code"`
+	JoinedAt           time.Time             `json:"joined_at"`
+	FideRating         int                   `json:"fide_rating"`
+	TacticsRating      int                   `json:"tactics_rating"`
+	PuzzleRushAccuracy float64               `json:"puzzle_rush_accuracy"`
+	Bullet             timeControlStatsModel `json:"bullet"`
+	Blitz              timeControlStatsModel `json:"blitz"`
+	Rapid              timeControlStatsModel `json:"rapid"`
+	Daily              timeControlStatsModel `json:"daily"`
+	OVR                int                   `json:"ovr"`
+	PlayStyle          string                `json:"play_style"`
+	Position           string                `json:"position"`
+	Attributes         attributesModel       `json:"attributes"`
+	WorkRate           workRateModel         `json:"work_rate"`
+	Badges             []string              `json:"badges"`
+	TopOpenings        []openingStatModel    `json:"top_openings"`
+	GamesSnapshot      int                   `json:"games_snapshot"`
 }
 
 func toCardDataModel(c domain.Card) cardDataModel {
@@ -59,21 +77,35 @@ func toCardDataModel(c domain.Card) cardDataModel {
 	}
 
 	return cardDataModel{
-		Username:      c.Player.Username,
-		Name:          c.Player.Name,
-		Title:         string(c.Player.Title),
-		Avatar:        c.Player.Avatar,
-		Followers:     c.Player.Followers,
-		CountryCode:   c.Player.CountryCode,
-		JoinedAt:      c.Player.JoinedAt,
-		FideRating:    c.Stats.FideRating,
-		Bullet:        toTimeControlModel(c.Stats.Bullet),
-		Blitz:         toTimeControlModel(c.Stats.Blitz),
-		Rapid:         toTimeControlModel(c.Stats.Rapid),
-		Daily:         toTimeControlModel(c.Stats.Daily),
-		OVR:           c.OVR,
-		PlayStyle:     string(c.PlayStyle),
-		Position:      string(c.Position),
+		Username:           c.Player.Username,
+		Name:               c.Player.Name,
+		Title:              string(c.Player.Title),
+		Avatar:             c.Player.Avatar,
+		Followers:          c.Player.Followers,
+		CountryCode:        c.Player.CountryCode,
+		JoinedAt:           c.Player.JoinedAt,
+		FideRating:         c.Stats.FideRating,
+		TacticsRating:      c.Stats.TacticsRating,
+		PuzzleRushAccuracy: c.Stats.PuzzleRushAccuracy,
+		Bullet:             toTimeControlModel(c.Stats.Bullet),
+		Blitz:              toTimeControlModel(c.Stats.Blitz),
+		Rapid:              toTimeControlModel(c.Stats.Rapid),
+		Daily:              toTimeControlModel(c.Stats.Daily),
+		OVR:                c.OVR,
+		PlayStyle:          string(c.PlayStyle),
+		Position:           string(c.Position),
+		Attributes: attributesModel{
+			Pac: c.Attributes.Pac,
+			Sho: c.Attributes.Sho,
+			Pas: c.Attributes.Pas,
+			Dri: c.Attributes.Dri,
+			Def: c.Attributes.Def,
+			Phy: c.Attributes.Phy,
+		},
+		WorkRate: workRateModel{
+			Attack:  string(c.WorkRate.Attack),
+			Defense: string(c.WorkRate.Defense),
+		},
 		Badges:        badges,
 		TopOpenings:   openings,
 		GamesSnapshot: c.GamesSnapshot,
@@ -104,17 +136,31 @@ func fromCardDataModel(m cardDataModel, cardType, tier string, computedAt, expir
 			Avatar: m.Avatar, Followers: m.Followers, CountryCode: m.CountryCode, JoinedAt: m.JoinedAt,
 		},
 		Stats: domain.PlayerStats{
-			FideRating: m.FideRating,
-			Bullet:     fromTimeControlModel(m.Bullet, domain.TimeControlBullet),
-			Blitz:      fromTimeControlModel(m.Blitz, domain.TimeControlBlitz),
-			Rapid:      fromTimeControlModel(m.Rapid, domain.TimeControlRapid),
-			Daily:      fromTimeControlModel(m.Daily, domain.TimeControlDaily),
+			FideRating:         m.FideRating,
+			TacticsRating:      m.TacticsRating,
+			PuzzleRushAccuracy: m.PuzzleRushAccuracy,
+			Bullet:             fromTimeControlModel(m.Bullet, domain.TimeControlBullet),
+			Blitz:              fromTimeControlModel(m.Blitz, domain.TimeControlBlitz),
+			Rapid:              fromTimeControlModel(m.Rapid, domain.TimeControlRapid),
+			Daily:              fromTimeControlModel(m.Daily, domain.TimeControlDaily),
 		},
-		CardType:      domain.CardType(cardType),
-		Tier:          domain.CardTier(tier),
-		OVR:           m.OVR,
-		PlayStyle:     domain.PlayStyle(m.PlayStyle),
-		Position:      domain.Position(m.Position),
+		CardType:  domain.CardType(cardType),
+		Tier:      domain.CardTier(tier),
+		OVR:       m.OVR,
+		PlayStyle: domain.PlayStyle(m.PlayStyle),
+		Position:  domain.Position(m.Position),
+		Attributes: domain.Attributes{
+			Pac: m.Attributes.Pac,
+			Sho: m.Attributes.Sho,
+			Pas: m.Attributes.Pas,
+			Dri: m.Attributes.Dri,
+			Def: m.Attributes.Def,
+			Phy: m.Attributes.Phy,
+		},
+		WorkRate: domain.WorkRate{
+			Attack:  domain.WorkRateLevel(m.WorkRate.Attack),
+			Defense: domain.WorkRateLevel(m.WorkRate.Defense),
+		},
 		Badges:        badges,
 		TopOpenings:   openings,
 		GamesSnapshot: m.GamesSnapshot,

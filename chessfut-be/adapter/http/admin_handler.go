@@ -29,7 +29,7 @@ func (h *AdminHandler) RefreshCard(w http.ResponseWriter, r *http.Request) {
 
 	card, err := h.refreshCard.Execute(r.Context(), username)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, err, "failed to refresh card")
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *AdminHandler) RefreshCard(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) SyncTitledPlayers(w http.ResponseWriter, r *http.Request) {
 	count, err := h.syncTitledPlayers.Execute(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, err, "failed to sync titled players")
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *AdminHandler) SyncTitledPlayers(w http.ResponseWriter, r *http.Request)
 func (h *AdminHandler) RefreshStaleCards(w http.ResponseWriter, r *http.Request) {
 	count, err := h.refreshStaleCards.Execute(r.Context(), 50)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeError(w, http.StatusInternalServerError, err, "failed to refresh stale cards")
 		return
 	}
 

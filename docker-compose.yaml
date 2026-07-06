@@ -8,8 +8,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - chessfut-net
     restart: unless-stopped
@@ -21,9 +19,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
         reservations:
-          memory: 128M
+          memory: 256M
 
   redis:
     container_name: chessfut_redis
@@ -33,8 +31,6 @@ services:
       --requirepass ${REDIS_PASSWORD}
       --maxmemory 128mb
       --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -48,9 +44,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 384M
         reservations:
-          memory: 64M
+          memory: 256M
 
   chessfut-backend:
     container_name: chessfut_backend
@@ -64,8 +60,11 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       ADMIN_API_KEY: "${ADMIN_API_KEY:?ADMIN_API_KEY is required}"
       CHESSCOM_USER_AGENT: "${CHESSCOM_USER_AGENT:-chessfut/1.0 (contact: your-email@example.com)}"
-    ports:
-      - "8099:8099"
+      CHESSCOM_BASE_URL: "${CHESSCOM_BASE_URL:-https://api.chess.com/pub}"
+      VIRTUAL_HOST: "api.chessfut.com"
+      VIRTUAL_PORT: "8099"
+      LETSENCRYPT_HOST: "api.chessfut.com"
+      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +79,30 @@ services:
           memory: 712M
         reservations:
           memory: 256M
+
+  chessfut-frontend:
+    container_name: chessfut_frontend
+    build:
+      context: ./chessfut-fe
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}"
+    environment:
+      VIRTUAL_HOST: "chessfut.com,www.chessfut.com"
+      VIRTUAL_PORT: "3139"
+      LETSENCRYPT_HOST: "chessfut.com,www.chessfut.com"
+      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
+    depends_on:
+      - chessfut-backend
+    networks:
+      - chessfut-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
 networks:
   chessfut-net:

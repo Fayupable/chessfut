@@ -80,3 +80,22 @@ func (m *mockCache) IsPromoted(ctx context.Context, username string) (bool, erro
 	args := m.Called(ctx, username)
 	return args.Bool(0), args.Error(1)
 }
+
+func (m *mockCardRepository) CountAll(ctx context.Context) (int, error) {
+	args := m.Called(ctx)
+	return args.Int(0), args.Error(1)
+}
+func (m *mockCache) GetTotalCardsCount(ctx context.Context) (int, bool, error) {
+	args := m.Called(ctx)
+	return args.Int(0), args.Bool(1), args.Error(2)
+}
+
+func (m *mockCache) SetTotalCardsCount(ctx context.Context, count int) error {
+	args := m.Called(ctx, count)
+	return args.Error(0)
+}
+
+func (m *mockCardRepository) SearchByUsername(ctx context.Context, prefix string, limit, offset int) ([]domain.Card, error) {
+	args := m.Called(ctx, prefix, limit, offset)
+	return args.Get(0).([]domain.Card), args.Error(1)
+}

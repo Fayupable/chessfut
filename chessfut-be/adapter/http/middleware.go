@@ -1,6 +1,7 @@
 package http
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"net/http"
 	"runtime"
@@ -11,10 +12,25 @@ import (
 func AdminAuthMiddleware(adminKey string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		key := r.Header.Get("X-Admin-Key")
-		if key == "" || key != adminKey {
-			writeError(w, http.StatusUnauthorized, "invalid admin key")
+		if key == "" || subtle.ConstantTimeCompare([]byte(key), []byte(adminKey)) != 1 {
+			writeErrorMessage(w, http.StatusUnauthorized, "invalid admin key")
 			return
 		}
+		next(w, r)
+	}
+}
+
+func CORSMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		next(w, r)
 	}
 }
@@ -52,6 +68,10 @@ func LoggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"mem_alloc_delta_bytes", int64(after.Alloc)-int64(before.Alloc),
 		)
 	}
+}
+
+func writeErrorMessage(w http.ResponseWriter, status int, publicMessage string) {
+	writeJSON(w, status, map[string]string{"error": publicMessage})
 }
 
 func clientIP(r *http.Request) string {

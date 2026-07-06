@@ -61,9 +61,11 @@ func (s TimeControlStats) WinRate() float64 {
 }
 
 type PlayerStats struct {
-	FideRating int
-	Bullet     TimeControlStats
-	Blitz      TimeControlStats
-	Rapid      TimeControlStats
-	Daily      TimeControlStats
+	FideRating         int
+	TacticsRating      int
+	PuzzleRushAccuracy float64
+	Bullet             TimeControlStats
+	Blitz              TimeControlStats
+	Rapid              TimeControlStats
+	Daily              TimeControlStats
 }

@@ -39,12 +39,21 @@ func extractCountryCode(countryURL string) string {
 
 func mapStats(r statsResponse) domain.PlayerStats {
 	return domain.PlayerStats{
-		FideRating: r.Fide,
-		Bullet:     mapTimeControlStats(r.ChessBullet, domain.TimeControlBullet),
-		Blitz:      mapTimeControlStats(r.ChessBlitz, domain.TimeControlBlitz),
-		Rapid:      mapTimeControlStats(r.ChessRapid, domain.TimeControlRapid),
-		Daily:      mapTimeControlStats(r.ChessDaily, domain.TimeControlDaily),
+		FideRating:         r.Fide,
+		TacticsRating:      r.Tactics.Highest.Rating,
+		PuzzleRushAccuracy: puzzleRushAccuracy(r.PuzzleRush),
+		Bullet:             mapTimeControlStats(r.ChessBullet, domain.TimeControlBullet),
+		Blitz:              mapTimeControlStats(r.ChessBlitz, domain.TimeControlBlitz),
+		Rapid:              mapTimeControlStats(r.ChessRapid, domain.TimeControlRapid),
+		Daily:              mapTimeControlStats(r.ChessDaily, domain.TimeControlDaily),
 	}
+}
+
+func puzzleRushAccuracy(r puzzleRushResponse) float64 {
+	if r.Best.TotalAttempts == 0 {
+		return 0
+	}
+	return float64(r.Best.Score) / float64(r.Best.TotalAttempts) * 100
 }
 
 func mapTimeControlStats(r statsRecord, tc domain.TimeControl) domain.TimeControlStats {

@@ -12,4 +12,7 @@ type CachePort interface {
 
 	IncrementViewCount(ctx context.Context, username string) (int, error)
 	IsPromoted(ctx context.Context, username string) (bool, error)
+
+	GetTotalCardsCount(ctx context.Context) (int, bool, error)
+	SetTotalCardsCount(ctx context.Context, count int) error
 }
