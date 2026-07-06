@@ -64,7 +64,7 @@ services:
       VIRTUAL_HOST: "api.chessfut.com"
       VIRTUAL_PORT: "8099"
       LETSENCRYPT_HOST: "api.chessfut.com"
-      LETSENCRYPT_EMAIL: "enisyaman4@gmail.com"
+      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,7 +72,6 @@ services:
         condition: service_healthy
     networks:
       - chessfut-net
-      - nginx-proxy-net
     restart: unless-stopped
     deploy:
       resources:
@@ -92,12 +91,11 @@ services:
       VIRTUAL_HOST: "chessfut.com,www.chessfut.com"
       VIRTUAL_PORT: "3139"
       LETSENCRYPT_HOST: "chessfut.com,www.chessfut.com"
-      LETSENCRYPT_EMAIL: "enisyaman4@gmail.com"
+      LETSENCRYPT_EMAIL: "${LETSENCRYPT_EMAIL}"
     depends_on:
       - chessfut-backend
     networks:
       - chessfut-net
-      - nginx-proxy-net
     restart: unless-stopped
     deploy:
       resources:
@@ -108,9 +106,6 @@ services:
 
 networks:
   chessfut-net:
-    driver: bridge
-  nginx-proxy-net:
-    name: nginx-proxy-net
     driver: bridge
 
 volumes:

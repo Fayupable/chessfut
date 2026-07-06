@@ -54,10 +54,6 @@ func mean(v []float64) float64 {
 	return sum / float64(len(v))
 }
 
-func sigmoid(z float64) float64 {
-	return 1 / (1 + math.Exp(-z))
-}
-
 // BuildCardScoring anchors the whole scoring pipeline to a player's *verified*
 // strength: FIDE rating when available (the authoritative, tightly-banded
 // real-world measure), falling back to chess.com's own rating scale otherwise.
@@ -118,7 +114,7 @@ func technicalScore(stats domain.PlayerStats, topOpenings []domain.OpeningStat) 
 	components := []float64{openingDiversity(topOpenings)}
 
 	if stats.TacticsRating > 0 {
-		components = append(components, normalize(stats.TacticsRating, chesscomMin, chesscomMax))
+		components = append(components, normalize(stats.TacticsRating, chesscomMax))
 	}
 	if stats.PuzzleRushAccuracy > 0 {
 		components = append(components, clampFloat(stats.PuzzleRushAccuracy, 0, 99))

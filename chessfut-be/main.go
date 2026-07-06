@@ -42,7 +42,7 @@ func main() {
 		Addr:     cfg.RedisAddr,
 		Password: cfg.RedisPassword,
 	})
-	defer redisClient.Close()
+	defer func() { _ = redisClient.Close() }()
 
 	chessComClient := chesscom.NewClient(cfg.ChessComUserAgent, cfg.ChessComBaseURL)
 	cardRepository := postgres.NewCardRepository(pool)
