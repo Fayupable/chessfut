@@ -114,7 +114,7 @@ func technicalScore(stats domain.PlayerStats, topOpenings []domain.OpeningStat) 
 	components := []float64{openingDiversity(topOpenings)}
 
 	if stats.TacticsRating > 0 {
-		components = append(components, normalize(stats.TacticsRating, chesscomMax))
+		components = append(components, normalize(stats.TacticsRating))
 	}
 	if stats.PuzzleRushAccuracy > 0 {
 		components = append(components, clampFloat(stats.PuzzleRushAccuracy, 0, 99))
