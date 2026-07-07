@@ -1,18 +1,21 @@
 package chesscom
 
 type profileResponse struct {
-	Username  string `json:"username"`
-	Name      string `json:"name"`
-	Title     string `json:"title"`
-	Avatar    string `json:"avatar"`
-	Followers int    `json:"followers"`
-	Country   string `json:"country"`
-	Joined    int64  `json:"joined"`
+	Username   string `json:"username"`
+	Name       string `json:"name"`
+	Title      string `json:"title"`
+	Avatar     string `json:"avatar"`
+	Followers  int    `json:"followers"`
+	Country    string `json:"country"`
+	Joined     int64  `json:"joined"`
+	URL        string `json:"url"`
+	LastOnline int64  `json:"last_online"`
 }
 
 type statsRecord struct {
 	Last struct {
 		Rating int `json:"rating"`
+		RD     int `json:"rd"`
 	} `json:"last"`
 	Best struct {
 		Rating int `json:"rating"`

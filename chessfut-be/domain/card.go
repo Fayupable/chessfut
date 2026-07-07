@@ -58,20 +58,22 @@ type WorkRate struct {
 }
 
 type Card struct {
-	Player        Player
-	Stats         PlayerStats
-	CardType      CardType
-	Tier          CardTier
-	OVR           int
-	PlayStyle     PlayStyle
-	Position      Position
-	Attributes    Attributes
-	WorkRate      WorkRate
-	Badges        []Badge
-	TopOpenings   []OpeningStat
-	GamesSnapshot int
-	ComputedAt    time.Time
-	ExpiresAt     time.Time
+	Player              Player
+	Stats               PlayerStats
+	CardType            CardType
+	Tier                CardTier
+	OVR                 int
+	PlayStyle           PlayStyle
+	Position            Position
+	Attributes          Attributes
+	WorkRate            WorkRate
+	Badges              []Badge
+	TopOpenings         []OpeningStat
+	GamesSnapshot       int
+	FideSource          string
+	EffectiveFideRating int
+	ComputedAt          time.Time
+	ExpiresAt           time.Time
 }
 
 func TotalGames(stats PlayerStats) int {

@@ -1,7 +1,33 @@
-import type { Card } from "@/types/card.types";
+import type { Card, Position } from "@/types/card.types";
 import { MetricBar } from "./MetricBar";
 
+const RD_UNRELIABLE_THRESHOLD = 50;
+
+const POSITION_EXPLANATIONS: Record<Position, string> = {
+  ST: "Forward — assigned for high SHO/PAC and fast, decisive games.",
+  CAM: "Attacking Midfielder — assigned for creative, DRI-led playmaking.",
+  CM: "Midfielder — assigned for balanced PAS/DRI playmaking.",
+  CB: "Defender — assigned for high DEF, longer games and a higher draw rate.",
+};
+
+function fideRatingLabel(card: Card): string | null {
+  if (card.fide_source === "verified" && card.fide_rating) {
+    return String(card.fide_rating);
+  }
+  if (card.fide_source === "title_default" && card.effective_fide_rating) {
+    return `Not linked (assumed ${card.effective_fide_rating})`;
+  }
+  return null;
+}
+
 export function ScoutingMetricsPanel({ card }: { card: Card }) {
+  const fideLabel = fideRatingLabel(card);
+  const hasUnreliableRating =
+    (card.bullet.rd > RD_UNRELIABLE_THRESHOLD && card.bullet.rating > 0) ||
+    (card.blitz.rd > RD_UNRELIABLE_THRESHOLD && card.blitz.rating > 0) ||
+    (card.rapid.rd > RD_UNRELIABLE_THRESHOLD && card.rapid.rating > 0);
+  const positionExplanation = card.position ? POSITION_EXPLANATIONS[card.position] : null;
+
   return (
     <div className="w-full max-w-xs rounded-xl border border-white/10 bg-neutral-900 p-5 text-white">
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-emerald-400">
@@ -14,6 +40,13 @@ export function ScoutingMetricsPanel({ card }: { card: Card }) {
           {card.work_rate.attack} / {card.work_rate.defense}
         </span>
       </div>
+
+      {fideLabel && (
+        <div className="mb-4 flex justify-between text-sm">
+          <span className="text-white/70">FIDE Rating</span>
+          <span className="font-semibold">{fideLabel}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-3">
         <MetricBar label="Bullet Rating" value={card.bullet.rating} max={3500} display={String(card.bullet.rating)} />
@@ -37,7 +70,30 @@ export function ScoutingMetricsPanel({ card }: { card: Card }) {
           />
         ) : null}
         <MetricBar label="Followers" value={card.followers} max={2000000} display={card.followers.toLocaleString()} />
+        <MetricBar label="Games Played" value={card.games_snapshot} max={100000} display={card.games_snapshot.toLocaleString()} />
       </div>
+
+      {positionExplanation && <p className="mt-4 text-xs text-white/40">{positionExplanation}</p>}
+      {fideLabel && card.fide_source === "title_default" && (
+        <p className="mt-2 text-xs text-white/40">
+          FIDE rating isn&apos;t linked on Chess.com — the {card.title} title&apos;s minimum norm rating was assumed instead.
+        </p>
+      )}
+      {hasUnreliableRating && (
+        <p className="mt-2 text-xs text-white/40">
+          Some ratings are based on limited recent games and may shift as more are played.
+        </p>
+      )}
+      {card.chesscom_url && (
+        <a
+          href={card.chesscom_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 block text-center text-xs text-emerald-400 underline hover:text-emerald-300"
+        >
+          View on Chess.com
+        </a>
+      )}
     </div>
   );
 }

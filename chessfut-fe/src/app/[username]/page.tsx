@@ -4,6 +4,7 @@ import { getDetailedCard } from "@/lib/api";
 import { PlayerCard } from "@/components/card/PlayerCard";
 import { CardActions } from "@/components/card/CardActions";
 import { ScoutingMetricsPanel } from "@/components/panels/ScoutingMetricsPanel";
+import { TopOpeningsPanel } from "@/components/panels/TopOpeningsPanel";
 import { TopBar } from "@/components/layout/TopBar";
 import { Footer } from "@/components/layout/Footer";
 import type { Card } from "@/types/card.types";
@@ -71,7 +72,10 @@ export default async function PlayerPage({
                     </div>
                     <CardActions username={card.username} />
                 </div>
-                <ScoutingMetricsPanel card={card} />
+                <div className="flex flex-col gap-6">
+                    <ScoutingMetricsPanel card={card} />
+                    <TopOpeningsPanel card={card} />
+                </div>
             </main>
             <Footer />
         </div>

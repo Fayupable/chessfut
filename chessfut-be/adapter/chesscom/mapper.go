@@ -26,6 +26,8 @@ func mapProfile(r profileResponse) domain.Player {
 		Followers:   r.Followers,
 		JoinedAt:    time.Unix(r.Joined, 0),
 		CountryCode: extractCountryCode(r.Country),
+		URL:         r.URL,
+		LastOnline:  time.Unix(r.LastOnline, 0),
 	}
 }
 
@@ -64,6 +66,7 @@ func mapTimeControlStats(r statsRecord, tc domain.TimeControl) domain.TimeContro
 		Wins:        r.Record.Win,
 		Losses:      r.Record.Loss,
 		Draws:       r.Record.Draw,
+		RD:          r.Last.RD,
 	}
 }
 
