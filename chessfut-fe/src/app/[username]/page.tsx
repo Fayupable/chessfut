@@ -66,16 +66,14 @@ export default async function PlayerPage({
         <div className="min-h-screen bg-neutral-900">
             <TopBar showBack />
             <main className="flex flex-col items-center justify-center gap-8 p-8 md:flex-row md:items-start md:justify-center">
+                <TopOpeningsPanel card={card} />
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-[300px]">
                         <PlayerCard card={card} />
                     </div>
                     <CardActions username={card.username} />
                 </div>
-                <div className="flex flex-col gap-6">
-                    <ScoutingMetricsPanel card={card} />
-                    <TopOpeningsPanel card={card} />
-                </div>
+                <ScoutingMetricsPanel card={card} />
             </main>
             <Footer />
         </div>
