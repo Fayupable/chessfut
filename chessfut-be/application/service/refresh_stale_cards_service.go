@@ -44,7 +44,7 @@ func (s *RefreshStaleCardsService) Execute(ctx context.Context, batchSize int) (
 			continue
 		}
 
-		rebuilt, err := s.buildCardByType(ctx, existing.Player.Username, existing.CardType)
+		rebuilt, err := buildCardByType(ctx, s.chessComClient, existing.Player.Username, existing.CardType)
 		if err != nil {
 			continue
 		}
@@ -55,9 +55,9 @@ func (s *RefreshStaleCardsService) Execute(ctx context.Context, batchSize int) (
 	return refreshed, nil
 }
 
-func (s *RefreshStaleCardsService) buildCardByType(ctx context.Context, username string, cardType domain.CardType) (domain.Card, error) {
+func buildCardByType(ctx context.Context, client output.ChessComClientPort, username string, cardType domain.CardType) (domain.Card, error) {
 	if cardType == domain.CardTypeDetailed {
-		return buildDetailedCard(ctx, s.chessComClient, username)
+		return buildDetailedCard(ctx, client, username)
 	}
-	return buildFastCard(ctx, s.chessComClient, username)
+	return buildFastCard(ctx, client, username)
 }
