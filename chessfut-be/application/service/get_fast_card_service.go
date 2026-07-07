@@ -86,21 +86,24 @@ func buildFastCard(ctx context.Context, client output.ChessComClientPort, userna
 
 	gamesSnapshot := domain.TotalGames(stats)
 	attributes, position, ovr, workRate := BuildCardScoring(player, stats, nil, nil, gamesSnapshot)
+	effectiveFide, fideSource := FideRatingInfo(player.Title, stats.FideRating)
 
 	now := time.Now()
 	return domain.Card{
-		Player:        player,
-		Stats:         stats,
-		CardType:      domain.CardTypeFast,
-		Tier:          tier,
-		OVR:           ovr,
-		Position:      position,
-		Attributes:    attributes,
-		WorkRate:      workRate,
-		Badges:        AssignBadges(player, stats),
-		GamesSnapshot: gamesSnapshot,
-		ComputedAt:    now,
-		ExpiresAt:     now.Add(cardTTL),
+		Player:              player,
+		Stats:               stats,
+		CardType:            domain.CardTypeFast,
+		Tier:                tier,
+		OVR:                 ovr,
+		Position:            position,
+		Attributes:          attributes,
+		WorkRate:            workRate,
+		Badges:              AssignBadges(player, stats),
+		GamesSnapshot:       gamesSnapshot,
+		FideSource:          fideSource,
+		EffectiveFideRating: effectiveFide,
+		ComputedAt:          now,
+		ExpiresAt:           now.Add(cardTTL),
 	}, nil
 }
 

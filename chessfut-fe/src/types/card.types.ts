@@ -3,6 +3,7 @@ export type CardType = "fast" | "detailed";
 export type PlayStyle = "aggressive" | "positional" | "defensive" | "balanced";
 export type Position = "ST" | "CM" | "CB" | "CAM";
 export type WorkRateLevel = "High" | "Med" | "Low";
+export type FideSource = "verified" | "title_default" | "none";
 
 export interface TimeControlStats {
   rating: number;
@@ -11,6 +12,7 @@ export interface TimeControlStats {
   losses: number;
   draws: number;
   win_rate: number;
+  rd: number;
 }
 
 export interface OpeningStat {
@@ -42,6 +44,8 @@ export interface Card {
   followers: number;
   country_code: string;
   joined_date: string;
+  chesscom_url?: string;
+  last_online?: string;
   card_type: CardType;
   tier: CardTier;
   ovr: number;
@@ -49,6 +53,10 @@ export interface Card {
   position?: Position;
   tactics_rating?: number;
   puzzle_rush_accuracy?: number;
+  fide_rating?: number;
+  effective_fide_rating?: number;
+  fide_source?: FideSource;
+  games_snapshot: number;
   attributes: Attributes;
   work_rate: WorkRate;
   badges: string[];

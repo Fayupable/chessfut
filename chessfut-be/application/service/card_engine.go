@@ -34,6 +34,8 @@ const (
 	fideWeight = 0.8
 
 	longGameMoves = 80.0
+
+	maxAnchorDeviation = 0.45
 )
 
 const maxPlausibleFideRating = 2900
@@ -69,7 +71,7 @@ func BuildCardScoring(
 	games []domain.Game,
 	gamesSnapshot int,
 ) (domain.Attributes, domain.Position, int, domain.WorkRate) {
-	raw := rawAttributeValues(stats, topOpenings, gamesSnapshot)
+	raw := rawAttributeValues(player.Title, stats, topOpenings, gamesSnapshot)
 
 	center := anchorScore(player.Title, stats)
 	attrs := elasticShape(raw, center)
@@ -78,25 +80,32 @@ func BuildCardScoring(
 	aggression := aggressionSignal(games)
 
 	position, family := positionFromVectors(attrs, drawRate, aggression, avgGameLength(games))
-	baseOVR := weightedOVR(attrs, family)
+	weightedScore := weightedOVRScore(attrs, family)
+	// Position weighting can zero out an attribute entirely (e.g. forwards
+	// ignore DEF/PHY), which lets a weak stat inflate the *other* stats via
+	// elasticShape's mean-relative shaping without ever being penalized —
+	// producing a final OVR that contradicts the anchor's verified ranking.
+	// Bounding the weighted score to a small band around the anchor keeps
+	// position flavor while guaranteeing the anchor's ranking always holds.
+	boundedScore := clampFloat(weightedScore, center-maxAnchorDeviation, center+maxAnchorDeviation)
 
 	nudge := titleNudge(player.Title)
-	ovr := int(clampFloat(math.Round(float64(baseOVR)+nudge*(99-float64(baseOVR))/99), 1, 99))
+	ovr := int(clampFloat(math.Round(boundedScore+nudge*(99-boundedScore)/99), 1, 99))
 
 	workRate := CalculateWorkRate(attrs)
 
 	return attrs, position, ovr, workRate
 }
 
-func rawAttributeValues(stats domain.PlayerStats, topOpenings []domain.OpeningStat, gamesSnapshot int) [statCount]float64 {
+func rawAttributeValues(title domain.Title, stats domain.PlayerStats, topOpenings []domain.OpeningStat, gamesSnapshot int) [statCount]float64 {
 	var raw [statCount]float64
 
-	speed := 0.6*float64(stats.Bullet.Rating) + 0.4*float64(stats.Blitz.Rating)
+	speed := speedSignal(stats)
 	raw[idxPac] = clampFloat(10+(speed-100)/30, statFloor, statCeiling)
 
 	raw[idxSho] = clampFloat(stats.Blitz.WinRate()*1.5+10, statFloor, statCeiling)
 
-	raw[idxPas] = clampFloat(10+(float64(stats.Rapid.Rating)-100)/30, statFloor, statCeiling)
+	raw[idxPas] = clampFloat(10+(passSignal(stats)-100)/30, statFloor, statCeiling)
 
 	raw[idxDri] = technicalScore(stats, topOpenings)
 
@@ -107,9 +116,47 @@ func rawAttributeValues(stats domain.PlayerStats, topOpenings []domain.OpeningSt
 	}
 	raw[idxDef] = clampFloat(nonLoss, statFloor, statCeiling)
 
-	raw[idxPhy] = clampFloat(math.Log(float64(gamesSnapshot)+1)/math.Log(100000)*99, statFloor, statCeiling)
+	volumePhy := math.Log(float64(gamesSnapshot)+1) / math.Log(100000) * 99
+	raw[idxPhy] = clampFloat(math.Max(volumePhy, titlePhysicalFloor(title)), statFloor, statCeiling)
 
 	return raw
+}
+
+// speedSignal falls back to blitz rating alone when bullet was never played,
+// so an absent format is treated as missing data rather than a real-zero
+// rating that would otherwise crater the PAC score.
+func speedSignal(stats domain.PlayerStats) float64 {
+	if stats.Bullet.Rating == 0 {
+		return float64(stats.Blitz.Rating)
+	}
+	return 0.6*float64(stats.Bullet.Rating) + 0.4*float64(stats.Blitz.Rating)
+}
+
+// passSignal falls back to the faster time controls when rapid was never
+// played, for the same reason as speedSignal.
+func passSignal(stats domain.PlayerStats) float64 {
+	if stats.Rapid.Rating > 0 {
+		return float64(stats.Rapid.Rating)
+	}
+	return math.Max(float64(stats.Bullet.Rating), float64(stats.Blitz.Rating))
+}
+
+// titlePhysicalFloor keeps a newly-created titled account from being
+// penalized on PHY (a pure games-played signal) just for not having racked
+// up a large game count yet.
+func titlePhysicalFloor(title domain.Title) float64 {
+	switch title {
+	case domain.TitleGM, domain.TitleWGM:
+		return 70
+	case domain.TitleIM, domain.TitleWIM:
+		return 65
+	case domain.TitleFM, domain.TitleWFM:
+		return 60
+	case domain.TitleCM, domain.TitleWCM:
+		return 55
+	default:
+		return 0
+	}
 }
 
 func technicalScore(stats domain.PlayerStats, topOpenings []domain.OpeningStat) float64 {
@@ -130,6 +177,33 @@ func peakRating(stats domain.PlayerStats) float64 {
 	return math.Max(peak, float64(stats.Rapid.Rating))
 }
 
+// FideRatingInfo reports both the FIDE rating actually used for scoring and
+// where it came from, so callers (the API response, the frontend) can
+// explain the number instead of presenting it as an unquestionable fact.
+//   - "verified": chess.com returned a real, plausible fide_rating
+//   - "title_default": fide_rating was missing or implausible, so the
+//     title's minimum norm rating was assumed instead
+//   - "none": no title and no fide_rating — chess.com rating alone drives
+//     the score
+func FideRatingInfo(title domain.Title, fideRating int) (effective int, source string) {
+	if fideRating > 0 && fideRating <= maxPlausibleFideRating {
+		return fideRating, "verified"
+	}
+
+	switch title {
+	case domain.TitleGM, domain.TitleWGM:
+		return 2500, "title_default"
+	case domain.TitleIM, domain.TitleWIM:
+		return 2400, "title_default"
+	case domain.TitleFM, domain.TitleWFM:
+		return 2300, "title_default"
+	case domain.TitleCM, domain.TitleWCM:
+		return 2200, "title_default"
+	default:
+		return 0, "none"
+	}
+}
+
 // effectiveFideRating falls back to the title's minimum norm rating when
 // chess.com doesn't have the player's FIDE rating linked, so a verified title
 // still counts for something instead of being treated as fully unrated. A
@@ -137,22 +211,8 @@ func peakRating(stats domain.PlayerStats) float64 {
 // self-reported data, not a genuine rating — it's ignored entirely rather
 // than trusted-but-capped.
 func effectiveFideRating(title domain.Title, fideRating int) int {
-	if fideRating > 0 && fideRating <= maxPlausibleFideRating {
-		return fideRating
-	}
-
-	switch title {
-	case domain.TitleGM, domain.TitleWGM:
-		return 2500
-	case domain.TitleIM, domain.TitleWIM:
-		return 2400
-	case domain.TitleFM, domain.TitleWFM:
-		return 2300
-	case domain.TitleCM, domain.TitleWCM:
-		return 2200
-	default:
-		return 0
-	}
+	effective, _ := FideRatingInfo(title, fideRating)
+	return effective
 }
 
 // anchorScore is the single "how strong is this player, really" number that
@@ -253,7 +313,7 @@ func positionFromVectors(attrs domain.Attributes, drawRate, aggression, avgMoves
 	}
 }
 
-func weightedOVR(attrs domain.Attributes, family string) int {
+func weightedOVRScore(attrs domain.Attributes, family string) float64 {
 	weights := map[string][statCount]float64{
 		"forward":   {0.30, 0.40, 0.10, 0.20, 0.00, 0.00},
 		"playmaker": {0.20, 0.00, 0.30, 0.30, 0.20, 0.00},
@@ -270,7 +330,7 @@ func weightedOVR(attrs domain.Attributes, family string) int {
 		sum += vals[i] * w
 	}
 
-	return int(math.Round(sum))
+	return sum
 }
 
 func titleNudge(title domain.Title) float64 {
@@ -281,6 +341,8 @@ func titleNudge(title domain.Title) float64 {
 		return 2
 	case domain.TitleFM, domain.TitleWFM:
 		return 1
+	case domain.TitleCM, domain.TitleWCM:
+		return 0.5
 	default:
 		return 0
 	}

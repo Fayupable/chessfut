@@ -11,6 +11,7 @@ type timeControlResponse struct {
 	Losses  int     `json:"losses"`
 	Draws   int     `json:"draws"`
 	WinRate float64 `json:"win_rate"`
+	RD      int     `json:"rd"`
 }
 
 type openingResponse struct {
@@ -35,27 +36,33 @@ type workRateResponse struct {
 }
 
 type cardResponse struct {
-	Username           string              `json:"username"`
-	Name               string              `json:"name"`
-	Title              string              `json:"title"`
-	Avatar             string              `json:"avatar"`
-	Followers          int                 `json:"followers"`
-	CountryCode        string              `json:"country_code"`
-	JoinedAt           time.Time           `json:"joined_date"`
-	CardType           string              `json:"card_type"`
-	Tier               string              `json:"tier"`
-	OVR                int                 `json:"ovr"`
-	PlayStyle          string              `json:"play_style,omitempty"`
-	Position           string              `json:"position,omitempty"`
-	TacticsRating      int                 `json:"tactics_rating,omitempty"`
-	PuzzleRushAccuracy float64             `json:"puzzle_rush_accuracy,omitempty"`
-	Attributes         attributesResponse  `json:"attributes"`
-	WorkRate           workRateResponse    `json:"work_rate"`
-	Badges             []string            `json:"badges"`
-	Bullet             timeControlResponse `json:"bullet"`
-	Blitz              timeControlResponse `json:"blitz"`
-	Rapid              timeControlResponse `json:"rapid"`
-	Daily              timeControlResponse `json:"daily"`
-	TopOpenings        []openingResponse   `json:"top_openings,omitempty"`
-	LastUpdated        time.Time           `json:"last_updated"`
+	Username            string              `json:"username"`
+	Name                string              `json:"name"`
+	Title               string              `json:"title"`
+	Avatar              string              `json:"avatar"`
+	Followers           int                 `json:"followers"`
+	CountryCode         string              `json:"country_code"`
+	JoinedAt            time.Time           `json:"joined_date"`
+	ChesscomURL         string              `json:"chesscom_url,omitempty"`
+	LastOnline          time.Time           `json:"last_online,omitempty"`
+	CardType            string              `json:"card_type"`
+	Tier                string              `json:"tier"`
+	OVR                 int                 `json:"ovr"`
+	PlayStyle           string              `json:"play_style,omitempty"`
+	Position            string              `json:"position,omitempty"`
+	TacticsRating       int                 `json:"tactics_rating,omitempty"`
+	PuzzleRushAccuracy  float64             `json:"puzzle_rush_accuracy,omitempty"`
+	FideRating          int                 `json:"fide_rating,omitempty"`
+	EffectiveFideRating int                 `json:"effective_fide_rating,omitempty"`
+	FideSource          string              `json:"fide_source,omitempty"`
+	GamesSnapshot       int                 `json:"games_snapshot"`
+	Attributes          attributesResponse  `json:"attributes"`
+	WorkRate            workRateResponse    `json:"work_rate"`
+	Badges              []string            `json:"badges"`
+	Bullet              timeControlResponse `json:"bullet"`
+	Blitz               timeControlResponse `json:"blitz"`
+	Rapid               timeControlResponse `json:"rapid"`
+	Daily               timeControlResponse `json:"daily"`
+	TopOpenings         []openingResponse   `json:"top_openings,omitempty"`
+	LastUpdated         time.Time           `json:"last_updated"`
 }

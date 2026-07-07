@@ -24,6 +24,8 @@ type Player struct {
 	Followers   int
 	JoinedAt    time.Time
 	CountryCode string
+	URL         string
+	LastOnline  time.Time
 }
 
 func (p Player) HasFideTitle() bool {
@@ -46,6 +48,7 @@ type TimeControlStats struct {
 	Wins        int
 	Losses      int
 	Draws       int
+	RD          int
 }
 
 func (s TimeControlStats) TotalGames() int {

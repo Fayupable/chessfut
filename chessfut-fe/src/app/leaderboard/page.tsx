@@ -75,6 +75,26 @@ export default async function LeaderboardPage({
                         <span />
                     )}
                 </div>
+
+                <form action="/leaderboard" method="GET" className="mt-2 flex items-center justify-center gap-2">
+                    <label htmlFor="page-jump" className="text-sm text-white/40">
+                        Go to page
+                    </label>
+                    <input
+                        id="page-jump"
+                        name="page"
+                        type="number"
+                        min={1}
+                        defaultValue={page}
+                        className="w-20 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1 text-center text-sm outline-none"
+                    />
+                    <button
+                        type="submit"
+                        className="rounded-md bg-emerald-500 px-3 py-1 text-sm font-semibold text-black hover:bg-emerald-400"
+                    >
+                        Go
+                    </button>
+                </form>
             </main>
             <Footer />
         </div>
