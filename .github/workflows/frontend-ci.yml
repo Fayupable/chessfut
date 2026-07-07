@@ -13,6 +13,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -34,8 +37,46 @@ jobs:
       - name: Type check
         run: cd chessfut-fe && npx tsc --noEmit
 
-      - name: Test
-        run: cd chessfut-fe && npm run test
+      - name: Test with coverage
+        run: cd chessfut-fe && npm run test:coverage
+
+      - name: Coverage check
+        id: coverage
+        run: |
+          cd chessfut-fe
+          COVERAGE=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct)")
+          echo "coverage=$COVERAGE" >> "$GITHUB_OUTPUT"
+          echo "Frontend Coverage: $COVERAGE%"
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const coverage = '${{ steps.coverage.outputs.coverage }}';
+            const pct = parseFloat(coverage);
+            const status = pct >= 50 ? 'PASS' : pct >= 20 ? 'WARN' : 'INFO';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: [
+                '## Frontend Coverage Report',
+                '',
+                `Status: ${status}`,
+                `Total Line Coverage: ${coverage}%`,
+                '',
+                '_Only pure logic functions are unit tested by design — components are verified manually via preview, not covered here._'
+              ].join('\n')
+            })
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: chessfut-fe/coverage/
+          retention-days: 7
 
       - name: Build
         env:

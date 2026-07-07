@@ -81,6 +81,7 @@ export default async function LeaderboardPage({
                         Go to page
                     </label>
                     <input
+                        key={page}
                         id="page-jump"
                         name="page"
                         type="number"
