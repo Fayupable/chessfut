@@ -26,6 +26,8 @@ func toCardModel(c domain.Card) cardModel {
 		Followers:          c.Player.Followers,
 		CountryCode:        c.Player.CountryCode,
 		JoinedAt:           c.Player.JoinedAt,
+		URL:                c.Player.URL,
+		LastOnline:         c.Player.LastOnline,
 		FideRating:         c.Stats.FideRating,
 		TacticsRating:      c.Stats.TacticsRating,
 		PuzzleRushAccuracy: c.Stats.PuzzleRushAccuracy,
@@ -50,16 +52,18 @@ func toCardModel(c domain.Card) cardModel {
 			Attack:  string(c.WorkRate.Attack),
 			Defense: string(c.WorkRate.Defense),
 		},
-		Badges:        badges,
-		TopOpenings:   openings,
-		GamesSnapshot: c.GamesSnapshot,
-		ComputedAt:    c.ComputedAt,
-		ExpiresAt:     c.ExpiresAt,
+		Badges:              badges,
+		TopOpenings:         openings,
+		GamesSnapshot:       c.GamesSnapshot,
+		FideSource:          c.FideSource,
+		EffectiveFideRating: c.EffectiveFideRating,
+		ComputedAt:          c.ComputedAt,
+		ExpiresAt:           c.ExpiresAt,
 	}
 }
 
 func toTimeControlModel(s domain.TimeControlStats) timeControlStatsModel {
-	return timeControlStatsModel{Rating: s.Rating, Highest: s.Highest, Wins: s.Wins, Losses: s.Losses, Draws: s.Draws}
+	return timeControlStatsModel{Rating: s.Rating, Highest: s.Highest, Wins: s.Wins, Losses: s.Losses, Draws: s.Draws, RD: s.RD}
 }
 
 func fromCardModel(m cardModel) domain.Card {
@@ -80,6 +84,7 @@ func fromCardModel(m cardModel) domain.Card {
 		Player: domain.Player{
 			Username: m.Username, Name: m.Name, Title: domain.Title(m.Title),
 			Avatar: m.Avatar, Followers: m.Followers, CountryCode: m.CountryCode, JoinedAt: m.JoinedAt,
+			URL: m.URL, LastOnline: m.LastOnline,
 		},
 		Stats: domain.PlayerStats{
 			FideRating:         m.FideRating,
@@ -107,14 +112,16 @@ func fromCardModel(m cardModel) domain.Card {
 			Attack:  domain.WorkRateLevel(m.WorkRate.Attack),
 			Defense: domain.WorkRateLevel(m.WorkRate.Defense),
 		},
-		Badges:        badges,
-		TopOpenings:   openings,
-		GamesSnapshot: m.GamesSnapshot,
-		ComputedAt:    m.ComputedAt,
-		ExpiresAt:     m.ExpiresAt,
+		Badges:              badges,
+		TopOpenings:         openings,
+		GamesSnapshot:       m.GamesSnapshot,
+		FideSource:          m.FideSource,
+		EffectiveFideRating: m.EffectiveFideRating,
+		ComputedAt:          m.ComputedAt,
+		ExpiresAt:           m.ExpiresAt,
 	}
 }
 
 func fromTimeControlModel(m timeControlStatsModel, tc domain.TimeControl) domain.TimeControlStats {
-	return domain.TimeControlStats{TimeControl: tc, Rating: m.Rating, Highest: m.Highest, Wins: m.Wins, Losses: m.Losses, Draws: m.Draws}
+	return domain.TimeControlStats{TimeControl: tc, Rating: m.Rating, Highest: m.Highest, Wins: m.Wins, Losses: m.Losses, Draws: m.Draws, RD: m.RD}
 }

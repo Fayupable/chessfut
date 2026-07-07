@@ -40,6 +40,7 @@ func (s *RefreshStaleCardsService) Execute(ctx context.Context, batchSize int) (
 			existing.Stats = freshStats
 			existing.ExpiresAt = time.Now().Add(cardTTL)
 			_ = s.cardRepository.Save(ctx, existing)
+			s.refreshCacheIfPresent(ctx, existing)
 			refreshed++
 			continue
 		}
@@ -49,10 +50,21 @@ func (s *RefreshStaleCardsService) Execute(ctx context.Context, batchSize int) (
 			continue
 		}
 		_ = s.cardRepository.Save(ctx, rebuilt)
+		s.refreshCacheIfPresent(ctx, rebuilt)
 		refreshed++
 	}
 
 	return refreshed, nil
+}
+
+// refreshCacheIfPresent keeps Redis in sync with Postgres for cards that are
+// already cached (titled/popular players) — without this, a rebuilt card
+// would sit correctly in Postgres while GetCard keeps serving the stale
+// Redis copy indefinitely, since the read path checks Redis first.
+func (s *RefreshStaleCardsService) refreshCacheIfPresent(ctx context.Context, card domain.Card) {
+	if _, found, err := s.cache.GetCard(ctx, card.Player.Username); err == nil && found {
+		_ = s.cache.SetCard(ctx, card)
+	}
 }
 
 func buildCardByType(ctx context.Context, client output.ChessComClientPort, username string, cardType domain.CardType) (domain.Card, error) {

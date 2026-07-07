@@ -28,6 +28,7 @@ func TestRefreshStaleCardsService_Execute(t *testing.T) {
 		repo.On("FindStale", ctx, mock.AnythingOfType("time.Time"), 50).Return([]domain.Card{staleCard}, nil)
 		client.On("GetStats", ctx, "hikaru").Return(freshStats, nil)
 		repo.On("Save", ctx, mock.AnythingOfType("domain.Card")).Return(nil)
+		cache.On("GetCard", ctx, "hikaru").Return(domain.Card{}, false, nil)
 
 		svc := NewRefreshStaleCardsService(client, repo, cache)
 		count, err := svc.Execute(ctx, 50)
@@ -37,6 +38,7 @@ func TestRefreshStaleCardsService_Execute(t *testing.T) {
 		client.AssertNotCalled(t, "GetProfile")
 		client.AssertExpectations(t)
 		repo.AssertExpectations(t)
+		cache.AssertNotCalled(t, "SetCard")
 	})
 
 	t.Run("rebuilds full card when game delta exceeds threshold", func(t *testing.T) {
@@ -56,6 +58,7 @@ func TestRefreshStaleCardsService_Execute(t *testing.T) {
 		client.On("GetProfile", ctx, "hikaru").Return(player, nil)
 		client.On("GetStats", ctx, "hikaru").Return(freshStats, nil)
 		repo.On("Save", ctx, mock.AnythingOfType("domain.Card")).Return(nil)
+		cache.On("GetCard", ctx, "hikaru").Return(domain.Card{}, false, nil)
 
 		svc := NewRefreshStaleCardsService(client, repo, cache)
 		count, err := svc.Execute(ctx, 50)
@@ -63,6 +66,7 @@ func TestRefreshStaleCardsService_Execute(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, count)
 		repo.AssertExpectations(t)
+		cache.AssertNotCalled(t, "SetCard")
 	})
 }
 
@@ -88,6 +92,7 @@ func TestRefreshStaleCardsService_Execute_RebuildsDetailedCardType(t *testing.T)
 	client.On("GetStats", ctx, "hikaru").Return(freshStats, nil)
 	client.On("GetGames", ctx, "hikaru", mock.AnythingOfType("time.Time"), mock.AnythingOfType("time.Time")).Return(games, nil)
 	repo.On("Save", ctx, mock.AnythingOfType("domain.Card")).Return(nil)
+	cache.On("GetCard", ctx, "hikaru").Return(domain.Card{}, false, nil)
 
 	svc := NewRefreshStaleCardsService(client, repo, cache)
 	count, err := svc.Execute(ctx, 50)
@@ -96,7 +101,35 @@ func TestRefreshStaleCardsService_Execute_RebuildsDetailedCardType(t *testing.T)
 	assert.Equal(t, 1, count)
 	client.AssertExpectations(t)
 	repo.AssertExpectations(t)
+	cache.AssertNotCalled(t, "SetCard")
 }
+
+func TestRefreshStaleCardsService_Execute_UpdatesCacheWhenCardIsCached(t *testing.T) {
+	ctx := context.Background()
+	staleCard := domain.Card{
+		Player:        domain.Player{Username: "hikaru"},
+		GamesSnapshot: 100,
+		CardType:      domain.CardTypeFast,
+	}
+	freshStats := domain.PlayerStats{Blitz: domain.TimeControlStats{Wins: 60, Losses: 40, Draws: 10}}
+
+	client := new(mockChessComClient)
+	repo := new(mockCardRepository)
+	cache := new(mockCache)
+	repo.On("FindStale", ctx, mock.AnythingOfType("time.Time"), 50).Return([]domain.Card{staleCard}, nil)
+	client.On("GetStats", ctx, "hikaru").Return(freshStats, nil)
+	repo.On("Save", ctx, mock.AnythingOfType("domain.Card")).Return(nil)
+	cache.On("GetCard", ctx, "hikaru").Return(staleCard, true, nil)
+	cache.On("SetCard", ctx, mock.AnythingOfType("domain.Card")).Return(nil)
+
+	svc := NewRefreshStaleCardsService(client, repo, cache)
+	count, err := svc.Execute(ctx, 50)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+	cache.AssertExpectations(t)
+}
+
 func TestRefreshStaleCardsService_Execute_ReturnsErrorWhenFindStaleFails(t *testing.T) {
 	ctx := context.Background()
 
