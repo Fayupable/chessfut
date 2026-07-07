@@ -3,6 +3,7 @@ package chesscom
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,11 @@ import (
 	"github.com/fayupable/chessfut-be/application/port/output"
 	"github.com/fayupable/chessfut-be/domain"
 )
+
+// ErrNotFound wraps chess.com 404 responses so callers can distinguish
+// "resource genuinely doesn't exist" (e.g. an archive month with zero
+// games, which chess.com can list but 404s on fetch) from real failures.
+var ErrNotFound = errors.New("chesscom: resource not found")
 
 type Client struct {
 	httpClient *http.Client
@@ -40,6 +46,9 @@ func (c *Client) GetGames(ctx context.Context, username string, from, to time.Ti
 
 		var resp gamesResponse
 		if err := c.doRequest(ctx, archiveURL, &resp); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				continue
+			}
 			return nil, err
 		}
 
@@ -95,6 +104,9 @@ func (c *Client) doRequest(ctx context.Context, url string, target any) error {
 	if resp.StatusCode == http.StatusTooManyRequests {
 		c.backOff()
 		return fmt.Errorf("chesscom: rate limited (429) for %s", url)
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("%w: %s", ErrNotFound, url)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("chesscom: unexpected status %d for %s", resp.StatusCode, url)
