@@ -2,8 +2,10 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/fayupable/chessfut-be/application/port/input"
@@ -15,6 +17,19 @@ const (
 	defaultSearchLimit      = 10
 	maxSearchLimit          = 50
 )
+
+// usernamePattern matches chess.com's actual username rules — letters,
+// digits, underscores and hyphens only. Anything else (dots, slashes, etc.)
+// can never be a real chess.com account, so rejecting it here means scanner
+// noise (.env, phpinfo.php, ...) never touches the chess.com rate limiter.
+//
+// Without this, mass-scanned junk paths queue up on the single, global
+// chess.com rate limiter (1 req/s) right alongside real users — a scanner
+// probing hundreds of fake usernames could delay legitimate card lookups by
+// minutes even though chess.com itself is never at risk of being flooded.
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{2,30}$`)
+
+var errInvalidUsername = errors.New("invalid username format")
 
 type CardHandler struct {
 	getFastCard     input.GetFastCardUseCase
@@ -42,6 +57,10 @@ func NewCardHandler(
 
 func (h *CardHandler) GetFastCard(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
+	if !usernamePattern.MatchString(username) {
+		writeError(w, http.StatusBadRequest, errInvalidUsername, "invalid username format")
+		return
+	}
 
 	card, err := h.getFastCard.Execute(r.Context(), username)
 	if err != nil {
@@ -54,6 +73,10 @@ func (h *CardHandler) GetFastCard(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) GetDetailedCard(w http.ResponseWriter, r *http.Request) {
 	username := r.PathValue("username")
+	if !usernamePattern.MatchString(username) {
+		writeError(w, http.StatusBadRequest, errInvalidUsername, "invalid username format")
+		return
+	}
 
 	card, err := h.getDetailedCard.Execute(r.Context(), username)
 	if err != nil {
