@@ -11,7 +11,6 @@ import (
 var syncedTitles = []domain.Title{
 	domain.TitleGM, domain.TitleWGM,
 	domain.TitleIM, domain.TitleWIM,
-	domain.TitleFM, domain.TitleWFM,
 }
 
 type SyncTitledPlayersService struct {

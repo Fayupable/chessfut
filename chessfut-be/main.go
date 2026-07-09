@@ -83,7 +83,7 @@ func main() {
 	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers)))
 	mux.HandleFunc("POST /api/admin/refresh-stale", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshStaleCards)))
 
-	startBackgroundJobs(refreshStaleCards, syncTitledPlayers)
+	startBackgroundJobs(refreshStaleCards)
 
 	log.Printf("chessfut-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
@@ -91,7 +91,7 @@ func main() {
 	}
 }
 
-func startBackgroundJobs(refreshStaleCards *service.RefreshStaleCardsService, syncTitledPlayers *service.SyncTitledPlayersService) {
+func startBackgroundJobs(refreshStaleCards *service.RefreshStaleCardsService) {
 	staleTicker := time.NewTicker(10 * time.Minute)
 	go func() {
 		for range staleTicker.C {
@@ -101,18 +101,6 @@ func startBackgroundJobs(refreshStaleCards *service.RefreshStaleCardsService, sy
 				continue
 			}
 			log.Printf("refreshed %d stale cards", count)
-		}
-	}()
-
-	syncTicker := time.NewTicker(24 * time.Hour)
-	go func() {
-		for range syncTicker.C {
-			count, err := syncTitledPlayers.Execute(context.Background())
-			if err != nil {
-				log.Printf("sync titled players failed: %v", err)
-				continue
-			}
-			log.Printf("synced %d new titled players", count)
 		}
 	}()
 }
