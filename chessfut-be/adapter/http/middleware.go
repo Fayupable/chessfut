@@ -3,6 +3,7 @@ package http
 import (
 	"crypto/subtle"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime"
 	"strings"
@@ -75,8 +76,22 @@ func writeErrorMessage(w http.ResponseWriter, status int, publicMessage string) 
 }
 
 func clientIP(r *http.Request) string {
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		return strings.Split(fwd, ",")[0]
+	fwd := r.Header.Get("X-Forwarded-For")
+	if fwd == "" {
+		return r.RemoteAddr
 	}
-	return r.RemoteAddr
+
+	parts := strings.Split(fwd, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		candidate := strings.TrimSpace(parts[i])
+		ip := net.ParseIP(candidate)
+		if ip != nil && !isPrivateOrInternalIP(ip) {
+			return candidate
+		}
+	}
+	return strings.TrimSpace(parts[0])
+}
+
+func isPrivateOrInternalIP(ip net.IP) bool {
+	return ip.IsPrivate() || ip.IsLoopback()
 }

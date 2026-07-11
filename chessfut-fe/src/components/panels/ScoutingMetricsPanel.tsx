@@ -20,6 +20,10 @@ function fideRatingLabel(card: Card): string | null {
   return null;
 }
 
+function hasNoRecordedGames(card: Card): boolean {
+  return card.bullet.rating === 0 && card.blitz.rating === 0 && card.rapid.rating === 0;
+}
+
 export function ScoutingMetricsPanel({ card }: { card: Card }) {
   const fideLabel = fideRatingLabel(card);
   const hasUnreliableRating =
@@ -77,6 +81,12 @@ export function ScoutingMetricsPanel({ card }: { card: Card }) {
       {fideLabel && card.fide_source === "title_default" && (
         <p className="mt-2 text-xs text-white/40">
           FIDE rating isn&apos;t linked on Chess.com — the {card.title} title&apos;s minimum norm rating was assumed instead.
+        </p>
+      )}
+      {card.title && hasNoRecordedGames(card) && (
+        <p className="mt-2 text-xs text-white/40">
+          No recorded Chess.com games in any format — this OVR is based on FIDE strength alone, discounted since
+          it&apos;s unproven on this platform.
         </p>
       )}
       {hasUnreliableRating && (

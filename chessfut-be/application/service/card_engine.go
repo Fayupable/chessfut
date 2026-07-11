@@ -36,6 +36,8 @@ const (
 	longGameMoves = 80.0
 
 	maxAnchorDeviation = 0.45
+
+	inactivityFactor = 0.65
 )
 
 const maxPlausibleFideRating = 2900
@@ -219,20 +221,25 @@ func effectiveFideRating(title domain.Title, fideRating int) int {
 // everything else (attribute shaping, OVR) is built around. FIDE dominates
 // when present (or assumed from title) since it's independently verified and
 // tightly banded; chess.com activity contributes a smaller nudge on top.
+// A player with zero games in every chess.com format has no platform-verified
+// performance to blend in — their FIDE-derived score is discounted by
+// inactivityFactor instead of granted in full, so an inactive titled account
+// never outranks someone who's actually proven their strength on chess.com.
 // Without FIDE or a title, chess.com rating alone drives it — no hard
-// ceiling, a genuinely strong untitled player can still land high. A player
-// with zero recorded rating in every format (an unused/inactive account) is
-// floored well below the chesscom sigmoid's ~30 base, so a blank account can
-// never outrank someone with real game history.
+// ceiling, a genuinely strong untitled player can still land high.
 func anchorScore(title domain.Title, stats domain.PlayerStats) float64 {
+	fide := effectiveFideRating(title, stats.FideRating)
 	peak := peakRating(stats)
+
 	if peak <= 0 {
-		return statFloor
+		if fide <= 0 {
+			return statFloor
+		}
+		fideScore := fideBase + fideRange/(1+math.Exp(-fideK*(float64(fide)-fideX0)))
+		return math.Max(fideScore*inactivityFactor, statFloor)
 	}
 
 	chesscomScore := chesscomBase + chesscomRange/(1+math.Exp(-chesscomK*(peak-chesscomX0)))
-
-	fide := effectiveFideRating(title, stats.FideRating)
 	if fide <= 0 {
 		return chesscomScore
 	}
