@@ -3,7 +3,15 @@ import type { Card, LeaderboardResponse } from "@/types/card.types";
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 async function fetchJSON<T>(path: string): Promise<T> {
-    const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+    const requestHeaders: HeadersInit = {};
+    if (typeof window === "undefined") {
+        const { headers } = await import("next/headers");
+        const incoming = await headers();
+        const forwardedFor = incoming.get("x-forwarded-for");
+        if (forwardedFor) requestHeaders["x-forwarded-for"] = forwardedFor;
+    }
+
+    const res = await fetch(`${API_URL}${path}`, { cache: "no-store", headers: requestHeaders });
     if (!res.ok) {
         throw new Error(`Request failed: ${res.status}`);
     }
