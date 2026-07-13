@@ -39,6 +39,7 @@ func (s *RefreshStaleCardsService) Execute(ctx context.Context, batchSize int) (
 		if delta < minGamesDeltaForRebuild {
 			existing.Stats = freshStats
 			existing.ExpiresAt = time.Now().Add(cardTTL)
+			existing.EffectiveFideRating, existing.FideSource = FideRatingInfo(existing.Player.Title, freshStats.FideRating)
 			_ = s.cardRepository.Save(ctx, existing)
 			s.refreshCacheIfPresent(ctx, existing)
 			refreshed++
