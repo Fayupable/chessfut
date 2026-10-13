@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	ChessComUserAgent string
 	ChessComBaseURL   string
 	MigrationsPath    string
+	TrustedProxies    []string
 }
 
 func Load() Config {
@@ -30,6 +32,7 @@ func Load() Config {
 		ChessComUserAgent: mustGetEnv("CHESSCOM_USER_AGENT"),
 		ChessComBaseURL:   mustGetEnv("CHESSCOM_BASE_URL"),
 		MigrationsPath:    getEnv("MIGRATIONS_PATH", "db/migration"),
+		TrustedProxies:    splitCSV(getEnv("TRUSTED_PROXY_IPS", "")),
 	}
 }
 
@@ -46,4 +49,18 @@ func mustGetEnv(key string) string {
 		log.Fatalf("missing required environment variable: %s", key)
 	}
 	return v
+}
+
+func splitCSV(v string) []string {
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

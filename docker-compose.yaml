@@ -59,6 +59,7 @@ services:
       REDIS_ADDR: "redis:6379"
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       ADMIN_API_KEY: "${ADMIN_API_KEY:?ADMIN_API_KEY is required}"
+      TRUSTED_PROXY_IPS: "${TRUSTED_PROXY_IPS:-}"
       CHESSCOM_USER_AGENT: "${CHESSCOM_USER_AGENT:-chessfut/1.0 (contact: your-email@example.com)}"
       CHESSCOM_BASE_URL: "${CHESSCOM_BASE_URL:-https://api.chess.com/pub}"
       VIRTUAL_HOST: "api.chessfut.com"

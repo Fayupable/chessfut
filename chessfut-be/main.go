@@ -26,6 +26,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	cfg := config.Load()
+	httpadapter.SetTrustedProxies(cfg.TrustedProxies)
 	ctx := context.Background()
 
 	if err := postgres.RunMigrations(cfg.DatabaseURL, cfg.MigrationsPath); err != nil {
@@ -73,11 +74,11 @@ func main() {
 	adminHandler := httpadapter.NewAdminHandler(refreshCard, syncTitledPlayers, refreshStaleCards)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetFastCard))))
-	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetDetailedCard))))
-	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetLeaderboard))))
-	mux.HandleFunc("GET /api/v1/stats", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.GetStats))))
-	mux.HandleFunc("GET /api/v1/search", httpadapter.CORSMiddleware(publicRateLimiter.Middleware(httpadapter.LoggingMiddleware(cardHandler.SearchPlayers))))
+	mux.HandleFunc("GET /api/v1/player/{username}", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(publicRateLimiter.Middleware(cardHandler.GetFastCard))))
+	mux.HandleFunc("GET /api/v1/player/{username}/detailed", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(publicRateLimiter.Middleware(cardHandler.GetDetailedCard))))
+	mux.HandleFunc("GET /api/v1/leaderboard", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(publicRateLimiter.Middleware(cardHandler.GetLeaderboard))))
+	mux.HandleFunc("GET /api/v1/stats", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(publicRateLimiter.Middleware(cardHandler.GetStats))))
+	mux.HandleFunc("GET /api/v1/search", httpadapter.CORSMiddleware(httpadapter.LoggingMiddleware(publicRateLimiter.Middleware(cardHandler.SearchPlayers))))
 
 	mux.HandleFunc("POST /api/admin/refresh/{username}", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.RefreshCard)))
 	mux.HandleFunc("POST /api/admin/sync-titled", httpadapter.LoggingMiddleware(httpadapter.AdminAuthMiddleware(cfg.AdminAPIKey, adminHandler.SyncTitledPlayers)))
